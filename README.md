@@ -1,4 +1,4 @@
 ShadowDB
 ========
 
-Replicated database with a formally-verified implementation of Paxos
+A replicated database with a formally-verified implementation of Paxos
