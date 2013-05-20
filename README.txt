@@ -1,6 +1,9 @@
 INSTALLATION
 ------------
 
+1) Compile ShadowDB using Apache Ant by simply typing 'ant' in the ShadowDB subdirectory. This will create ShadowDB.jar in the project root directory.
+2) Compile Aneris: TODO 
+
 CONFIGURATION
 -------------
 
