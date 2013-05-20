@@ -40,7 +40,6 @@ package edu.Cornell.Diversity.ShadowDB;
 
 import java.io.Serializable;
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.LinkedList;
 
 /**
@@ -90,15 +89,5 @@ public class BatchShadowT extends ShadowTransaction implements Serializable {
 
 	public LinkedList<ShadowTransaction> getBatch() {
 		return this.batch;
-	}
-
-	@Override
-	public QueryResult executeQuery(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public boolean executeUpdate(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
 	}
 }

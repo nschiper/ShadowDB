@@ -63,7 +63,7 @@ public class QueryResult implements Serializable {
 
 	private boolean aborted = false;
 
-	private LinkedHashMap<Integer, HashMap<String, Object>> results;
+	private final LinkedHashMap<Integer, HashMap<String, Object>> results;
 
 	/**
 	 * Stores the index from which the next rows will be stored.
@@ -150,6 +150,7 @@ public class QueryResult implements Serializable {
 				for (String column : row.keySet()) {
 					sb.append("\t column: " + column + " value: " + row.get(column));
 				}
+				sb.append("\n");
 			}
 			sb.append("\n");
 		}

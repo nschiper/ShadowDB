@@ -57,7 +57,7 @@ import edu.Cornell.Diversity.Utils.DbUtils;
 public class PopulateBankDBTransaction extends ShadowTransaction {
 
 	private static final long serialVersionUID = 1L;
-	private static transient final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.ShadowDB.InitBankDbTransaction");
+	private static transient final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.Test.PopulateBankDBTransaction");
 
 	private int accountCount;
 
@@ -110,15 +110,5 @@ public class PopulateBankDBTransaction extends ShadowTransaction {
 			LOG.info("Table " + BankingApp.TABLE_NAME + " already exists, skipping database population.");
 		}
 		return new QueryResult();
-	}
-
-	@Override
-	public QueryResult executeQuery(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public boolean executeUpdate(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
 	}
 }

@@ -52,6 +52,8 @@ import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
+import com.sun.istack.internal.Nullable;
+
 import edu.Cornell.Diversity.ShadowDB.ShadowDBConfig;
 import edu.Cornell.Diversity.Utils.NIOUtils;
 
@@ -67,9 +69,28 @@ public class FailFastSocket extends Thread {
 
 	private static final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.Utils.FailFastSocket");
 
+	public static final String UNKNOWN_ID = "Unknown ID";
+
+	/**
+	 * Default timeout when retrying to connect to a remote host
+	 * or when trying to read the remote end point id.
+	 */
+	private static final int DEFAULT_TIMEOUT_MILLIS = 500;
+
+	/**
+	 * The default number of retries before considering
+	 * the remote host dead. This is used only
+	 * when connecting to the remote host and
+	 * retrieving its id. After the connection
+	 * is established, failure detection is done
+	 * using heart beats and a timeout value
+	 * defined in ShadowDBConfig.java.
+	 */
+	private static final int DEFAULT_RETRY_COUNT = 30;
+
 	private static final long HEARTBEAT_HEADER = -1;
 
-	private SocketChannel socketChannel;
+	private final SocketChannel socketChannel;
 
 	/**
 	 * These are pipes that the client will respectively
@@ -78,6 +99,8 @@ public class FailFastSocket extends Thread {
 	 */
 	private Pipe sendPipe;
 	private Pipe rcvPipe;
+
+	private Selector selector;
 
 	/**
 	 * Id of the end point we are connected to.
@@ -103,11 +126,13 @@ public class FailFastSocket extends Thread {
 	 */
 	private ByteBuffer byteBuffer;
 
-	private void initObject(String id) throws Exception {
+	private void initObject(String localId, String remoteId) throws Exception {
 		this.sendPipe = Pipe.open();
 		this.sendPipe.source().configureBlocking(false);
 		this.rcvPipe = Pipe.open();
 		this.rcvPipe.source().configureBlocking(false);
+
+		this.selector = Selector.open();
 
 		this.endPointCrashed = new AtomicBoolean(false);
 
@@ -118,94 +143,101 @@ public class FailFastSocket extends Thread {
 
 		this.byteBuffer = ByteBuffer.allocate(ShadowDBConfig.getMaxMsgSize());			
 
-		// Send our id
-		NIOUtils.writeToChannel(this.socketChannel, id, byteBuffer);
+		/**
+		 * Send our id.
+		 */
+		NIOUtils.writeToChannel(this.socketChannel, localId, byteBuffer);
+		this.endPointId = null;
 
-		// Make sure we don't block forever waiting for the end point id.
-		this.socketChannel.socket().setSoTimeout(ShadowDBConfig.getSocketTimeout());
-		endPointId = (String) NIOUtils.readObjFromChannel(socketChannel, byteBuffer, endPointCrashed);
+		/**
+		 * Obtain the id of the other end point.
+		 */
+		for (int i = 0; i < DEFAULT_RETRY_COUNT && this.endPointId == null; i++) {
+			this.endPointId = (String) NIOUtils.readObjFromChannel(socketChannel, byteBuffer, endPointCrashed);
 
-		// Set the channel to non-blocking mode
+			if (this.endPointId == null) {
+				Thread.sleep(DEFAULT_TIMEOUT_MILLIS);
+			}
+		}
+
+		if (this.endPointId == null) {
+			throw new SuspectedCrashException(remoteId);
+		}
+	}
+
+	private FailFastSocket(String ip, int port, String localId) throws Exception {
+		SocketAddress socketAddress = new InetSocketAddress(ip, port);
+		this.socketChannel = SocketChannel.open();
+		this.socketChannel.configureBlocking(false);
+		this.socketChannel.connect(socketAddress);
+	}
+
+	private FailFastSocket(SocketChannel channel) throws Exception {
+		this.socketChannel = channel;
 		this.socketChannel.configureBlocking(false);
 	}
 
-	/**
-	 * Creates a fail-fast socket out of a SocketChannel. The id parameter
-	 * denotes the id of this end point of the socket.
-	 */
-	private FailFastSocket(String ip, int port, String id) throws Exception {
-
-		SocketAddress socketAddress = new InetSocketAddress(ip, port);
-		this.socketChannel = SocketChannel.open();
-		this.socketChannel.connect(socketAddress);
-
-		initObject(id);
-	}
-
-	private FailFastSocket(SocketChannel channel, String id) throws Exception {
-		this.socketChannel = channel;
-
-		initObject(id);
-	}
-
-	public static FailFastSocket newInstance(SocketChannel channel, String remoteId)
+	public static FailFastSocket newInstance(SocketChannel channel, String localId, @Nullable String remoteId)
 		throws SuspectedCrashException {
 
+		if (remoteId == null) {
+			remoteId = UNKNOWN_ID;
+		}
+
 		try {
-			FailFastSocket ffSocket = new FailFastSocket(channel, remoteId);
-	
+			FailFastSocket ffSocket = new FailFastSocket(channel);
+			ffSocket.initObject(localId, remoteId);
+
 			ffSocket.start();
 			return ffSocket;
-		} catch (Exception sce) {
+		} catch (Exception e) {
 			throw new SuspectedCrashException(remoteId);
 		}
 	}
 
-	public static FailFastSocket newInstance(String ip, int port, String remoteId, String localId)
+	public static FailFastSocket newInstance(String ip, int port, String localId, String remoteId)
 		throws SuspectedCrashException {
 
-		try {
-			FailFastSocket ffSocket = new FailFastSocket(ip, port, localId);
-	
-			ffSocket.start();
-			return ffSocket;
-		} catch (Exception sce) {
-			throw new SuspectedCrashException(remoteId);
+		if (remoteId == null) {
+			remoteId = UNKNOWN_ID;
 		}
-	}
-
-	public static FailFastSocket newInstanceWithRetries(String ip, int port, String remoteId, String localId,
-		int noRetrials) throws SuspectedCrashException {
 
 		FailFastSocket ffSocket = null;
-		boolean connected = false;
 
-		for (int i = 0; i < noRetrials && !connected; i++) {
+		for (int i = 0; i < DEFAULT_RETRY_COUNT; i++) {
 			try {
-				ffSocket = new FailFastSocket(ip, port, localId);
-				connected = true;
-			} catch (Exception e) {
-				try {
-					// Sleep before retrying
-					if (i < (noRetrials - 1)) {
-						Thread.sleep(ShadowDBConfig.getSocketTimeout());
-					}
-				} catch (InterruptedException ie) {
-					// Do nothing...
+				if (i > 0) {
+					Thread.sleep(DEFAULT_TIMEOUT_MILLIS);
 				}
+
+				if (ffSocket == null) {
+					ffSocket = new FailFastSocket(ip, port, localId);
+				}
+
+				if (ffSocket.socketChannel.isOpen()) {
+					if (ffSocket.socketChannel.isConnectionPending()) {
+						ffSocket.socketChannel.finishConnect();
+					}
+					if (ffSocket.socketChannel.isConnected()) {
+						ffSocket.initObject(localId, remoteId);
+						ffSocket.start();
+						return ffSocket;
+					}
+				} else {
+					ffSocket.socketChannel.close();
+					ffSocket = null;
+				}
+			} catch (Exception e) {
+				LOG.warning("Unable to connect to: " + ip + ":" + port + " id: " + remoteId);
 			}
 		}
-		if (!connected) {
-			throw new SuspectedCrashException(remoteId);
-		} else {
-			ffSocket.start();
-			return ffSocket;
-		}
+
+		throw new SuspectedCrashException(remoteId);
 	}
 
 	private long computeTimeout(long now, long lastRcvdMsgTS, long lastSentMsgTS, long heartBeatInterval) {
 		long timeAfterRcvdMsg = now - lastRcvdMsgTS;
-		long suspicionTimeout = Math.max(ShadowDBConfig.getSocketTimeout() - timeAfterRcvdMsg, 0L);
+		long suspicionTimeout = Math.max(ShadowDBConfig.getHeartBeatTimeout() - timeAfterRcvdMsg, 0L);
 		long timeAfterSentMsg = now - lastSentMsgTS;
 		long sendHBTimeout = Math.max(heartBeatInterval - timeAfterSentMsg, 0L);
 		long timeout = Math.min(sendHBTimeout, suspicionTimeout);
@@ -219,7 +251,7 @@ public class FailFastSocket extends Thread {
 
 	public void run() {
 		try {
-			ByteBuffer heartBeat = ByteBuffer.allocate(NIOUtils.NO_BYTES_LONG).putLong(HEARTBEAT_HEADER);
+			ByteBuffer heartBeat = ByteBuffer.allocate(NIOUtils.BYTE_COUNT_LONG).putLong(HEARTBEAT_HEADER);
 			ByteBuffer msgBuffer = ByteBuffer.allocate(ShadowDBConfig.getMaxMsgSize());
 
 			Selector selector = Selector.open();
@@ -239,7 +271,7 @@ public class FailFastSocket extends Thread {
 				now = System.currentTimeMillis();
 
 				// Suspect the end point to have crashed?
-				if (lastRcvdMsgTS <= (now - ShadowDBConfig.getSocketTimeout())) {
+				if (lastRcvdMsgTS <= (now - ShadowDBConfig.getHeartBeatTimeout())) {
 					notifyCrash();
 					continue;
 				}
@@ -288,9 +320,10 @@ public class FailFastSocket extends Thread {
 				}
 			}
 		} catch (Exception e) {
-			// If any exception is raised, we consider the other end to have crashed.
+			/**
+			 * If any exception is raised, we consider the other end to have crashed.
+			 */
 			notifyCrash();
-			LOG.fine("Exception: \"" + e + "\" caught in fail fast socket connected to: " + endPointId);
 		}
 	}
 
@@ -328,7 +361,7 @@ public class FailFastSocket extends Thread {
 					}
 				}
 			} catch (Exception e) {
-				LOG.warning("Exception: " + e + "caught while receiving object: " +
+				LOG.warning("Exception: " + e + " caught while receiving object: " +
 					" sent from: " + endPointId);
 			}
 		} while (msg == null && !endPointCrashed.get());
@@ -366,6 +399,12 @@ public class FailFastSocket extends Thread {
 	}
 
 	public void close() throws IOException {
+		/**
+		 * This stops the thread.
+		 */
+		endPointCrashed.set(true);
+		selector.wakeup();
+
 		socketChannel.close();
 		rcvPipe.sink().close();
 		rcvPipe.source().close();
@@ -391,5 +430,9 @@ public class FailFastSocket extends Thread {
 	 */
 	private static class EndPointCrashSuspicion implements Serializable {
 		private static final long serialVersionUID = 1L;
+	}
+
+	public String getRemoteAddress() {
+		return socketChannel.socket().getRemoteSocketAddress().toString();
 	}
 }

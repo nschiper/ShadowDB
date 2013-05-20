@@ -63,44 +63,23 @@ public class ShadowDBConfig {
 		}
 	}
 
-	protected static enum TRANS_MODE_TYPE {NORMAL, TWO_PHASE};
-
 	/**
-	 * When the transaction mode is set to NORMAL, transactions extending class
-	 * ShadowTransaction must implement executeSQL. When set to TWO_PHASE,
-	 * executeQuery and executeUpdat must be implemented. The query phase is
-	 * only executed on the primary, the update phase is executed both
-	 * on the primary and the backups. The query phase must fully
-	 * determine the update phase. This is typically accomplished
-	 * using instance variables.
+	 * Timeout (in milliseconds) on heart beats that we use to suspect remote machines
+	 * to have crashed.
 	 */
-	private static final TRANS_MODE_TYPE DEFAULT_TRANSACTION_MODE = TRANS_MODE_TYPE.NORMAL;
+	private static final int DEFAULT_HEARBEAT_TIMEOUT = 10000;
 
-	public static TRANS_MODE_TYPE getTransactionMode() {
-		if (System.getProperty("transactionMode") != null) {
-			return TRANS_MODE_TYPE.valueOf(System.getProperty("transactionMode"));
-		} else {
-			return DEFAULT_TRANSACTION_MODE;
-		}
-	}
-
-	/**
-	 * Timeout (in milliseconds) used when connecting to a socket,
-	 * and sending/receiving messages on that socket.
-	 */
-	private static final int DEFAULT_SOCKET_TIMEOUT = 10000;
-
-	public static int getSocketTimeout() {
+	public static int getHeartBeatTimeout() {
 		if (System.getProperty("socketTimeout") != null) {
 			return Integer.parseInt(System.getProperty("socketTimeout"));
 		} else {
-			return DEFAULT_SOCKET_TIMEOUT;
+			return DEFAULT_HEARBEAT_TIMEOUT;
 		}
 	}
 
 	/**
 	 * The maximum number of bytes for a message sent over
-	 * the network. This can be increased if needed.
+	 * the network when using Java NIO. This can be increased if needed.
 	 */
 	private static final int DEFAULT_MAX_MSG_SIZE = 50000;
 
@@ -109,22 +88,6 @@ public class ShadowDBConfig {
 			return Integer.parseInt(System.getProperty("maxMsgSize"));
 		} else {
 			return DEFAULT_MAX_MSG_SIZE;
-		}
-	}
-
-	/**
-	 * The default maximum size of a database cell. If this value is not large
-	 * enough and it is not set to a higher value using the corresponding Java
-	 * property, replicas will not be able to send database snapshots and
-	 * recovery from a failure will not succeed.
-	 */
-	private static final int DEFAULT_MAX_DB_CELL_SIZE = 100;
-
-	public static int getMaxDbCellSize() {
-		if (System.getProperty("maxDbCellSize") != null) {
-			return Integer.parseInt(System.getProperty("maxDbCellSize"));
-		} else {
-			return DEFAULT_MAX_DB_CELL_SIZE;
 		}
 	}
 

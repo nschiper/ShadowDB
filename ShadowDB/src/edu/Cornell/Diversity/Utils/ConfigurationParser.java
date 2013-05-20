@@ -192,23 +192,11 @@ public class ConfigurationParser {
 	}
 
 	/**
-	 * Returns the number at the end of the id, and null otherwise.
-	 */
-	private Integer extractNbFromId(String id) {
-		for (int i = 0; i < id.length(); i++) {
-			if (Character.isDigit(id.charAt(i))) {
-				return Integer.parseInt(id.substring(i));
-			}
-		}
-		return null;
-	}
-
-	/**
 	 * Returns the client port of the given db id.
 	 */
 	public Integer getClientPort(String dbId) {
 
-		String clientId = "client" + extractNbFromId(dbId);
+		String clientId = "client" + DbUtils.extractIntFromId(dbId);
 		return getPortFromId(clientId);
 	}
 

@@ -52,7 +52,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
 
 import edu.Cornell.Diversity.ResilientTCP.FailFastSocket;
-import edu.Cornell.Diversity.ShadowDB.ShadowDBConfig.TRANS_MODE_TYPE;
 import edu.Cornell.Diversity.Utils.ConfigurationParser;
 import edu.Cornell.Diversity.Utils.DbUtils;
 import edu.Cornell.Diversity.Utils.IdIpPort;
@@ -65,7 +64,7 @@ import edu.Cornell.Diversity.Utils.DbUtils.DB_TYPE;
  * based on the primary-backup approach and works as follows:
  * 
  * -Database replicas form a group. The group has a primary that executes
- *  transactions and forwards updates to the backups. Once the primary
+ *  transactions and forwards them to the backups. Once the primary
  *  received acknowledgment from all backups, thereby certifying that
  *  they persisted the updates, the primary commits the transaction locally
  *  and replies to the client with the transaction's result.
@@ -78,19 +77,13 @@ import edu.Cornell.Diversity.Utils.DbUtils.DB_TYPE;
  *  
  *  -To ensure correct execution when failures occur, we require that
  *  once a group member suspects a failure it "wedges" itself and stops executing
- *  transactions (if it is the primary) or stops applying updates (if it is a backup).
- *  This ensures that the current group cannot execute transactions anymore. To ensure
- *  liveness, a new group membership will be installed where the replica suspected of having
+ *  transactions. This ensures that the current group incarnation does not execute transactions anymore.
+ *  To ensure liveness, a new group membership will be installed where the replica suspected of having
  *  crashed is replaced by a fresh replica. To ensure backups start in the same state 
  *  as the primary, the primary transfers its state to the backups.
  *  
  * -Transactions submitted to the primary are a subclass of ShadowTransaction.java. Transactions
- *  either implement the executeSQL method of the ShadowTransaction class or the executeQuery
- *  and executeUpdate methods. In the first case, update transactions are executed both
- *  on the primary and on the backups. In the second case, only the primary executes "executeQuery".
- *  The primary and backups execute "executeUpdate". It must be the case that after "executeQuery"
- *  has been invoked, "executeUpdate" is fully parameterized. This is typically accomplished
- *  by storing parameters of the update phase as instance variables. 
+ *  implement the executeSQL method of the ShadowTransaction class.
  * 
  *  The replication protocol assumes a crash model where replicas may crash at any point in time. 
  *  To tolerate up to f replica failures, f+1 databases are deployed. The protocol assumes that there will always be
@@ -129,7 +122,7 @@ public class ShadowDBServer {
 
 	/**
 	 * A hashmap used to garbage collect the TRANS_EXECUTED hashtable. Transaction ids
-	 * are inserted along with the time of insertion. Transactions older than GC_TIMEOUT_MILLIS
+	 * are inserted along with the time of insertion. Transactions older than gcTimeoutMillis
 	 * milliseconds will be garbage collected from TRANS_EXECUTED and toGarbageCollect.
 	 */
 	private final LinkedHashMap<Long, TransactionId> toGC;
@@ -148,17 +141,6 @@ public class ShadowDBServer {
 	 * the transaction although backups have executed the transaction already. 
 	 */
 	private final int gcTimeoutMillis;
-
-	/**
-	 * When the transaction mode is set to NORMAL, transactions extending class
-	 * ShadowTransaction must implement executeSQL. When set to TWO_PHASE,
-	 * executeQuery and executeUpdat must be implemented. The query phase is
-	 * only executed on the primary, the update phase is executed both
-	 * on the primary and the backups. The query phase must fully
-	 * determine the update phase. This is typically accomplished
-	 * using instance variables.
-	 */
-	private final TRANS_MODE_TYPE transMode;
 
 	/**
 	 * Connection to the SQL database.
@@ -194,8 +176,6 @@ public class ShadowDBServer {
 	    this.nextSeqNo = nextSeqNo;
 	    this.acknowledgments = new HashMap<TransactionId, HashSet<String>>(100000);
 	    this.id2IdMap = new HashMap<TransactionId, TransactionId>(100000);
-
-	    this.transMode = ShadowDBConfig.getTransactionMode();
 
 	    this.gcTimeoutMillis = ShadowDBConfig.getGcTimeoutMillis();
 	    this.toGC = new LinkedHashMap<Long, TransactionId>();
@@ -236,43 +216,13 @@ public class ShadowDBServer {
 		if (t instanceof BatchShadowT) {
 			BatchShadowT batch = (BatchShadowT) t;
 			for (ShadowTransaction trans : batch.getBatch()) {
-				if (group.isPrimary()) {
-					QueryResult result = trans.executeSql(connection);
+				QueryResult result;
+
+				if (group.isPrimary() || !trans.isReadOnly()) {
+					result = trans.executeSql(connection);
 
 					TRANS_EXECUTED.put(trans.getId(), result);
 					toGC.put(now, trans.getId());
-
-				} else if (!trans.isReadOnly()){
-					trans.executeSql(connection);
-				}
-			}
-		} else {
-			if (group.isPrimary() || !t.isReadOnly()) {
-				QueryResult result = t.executeSql(connection);
-
-				TRANS_EXECUTED.put(t.getId(), result);
-				toGC.put(now, t.getId());
-			}
-		}
-	}
-
-	private void executeTransactions2Phase(ShadowTransaction t, Connection connection, long now) throws SQLException {
-
-		if (t instanceof BatchShadowT) {
-			BatchShadowT batch = (BatchShadowT) t;
-
-			for (ShadowTransaction trans : batch.getBatch()) {
-				if (group.isPrimary()) {
-					QueryResult result = trans.executeQuery(connection);
-
-					if (!trans.isReadOnly()) {
-						trans.executeUpdate(connection);
-					}
-
-					TRANS_EXECUTED.put(trans.getId(), result);
-					toGC.put(now, trans.getId());
-				} else if (!trans.isReadOnly()){
-					trans.executeUpdate(connection);
 				}
 			}
 		} else {
@@ -343,19 +293,33 @@ public class ShadowDBServer {
 						clientTId.notify();
 					}
 					id2IdMap.remove(transId);
+				/**
+				 * We got a confirmation from all backups that they applied
+				 * the database snapshot we just sent. We can now send the
+				 * answer to all transactions we executed whose answer was not
+				 * communicated to the clients yet.
+				 */
+				} else {
+					for (TransactionId tId : id2IdMap.values()) {
+						synchronized (tId) {
+							tId.notify();
+						}
+					}
+					id2IdMap.clear();
 				}
 			}
 		}		
 	}
 
-	
 	public void onGroupReconfiguration(long seqNo) throws Exception {
 
 		nextSeqNo = seqNo;
 
 		if (group.isPrimary()) {
 
-			// Send the database schema.
+			/**
+			 * Send the database schema.
+			 */
 			DbSchema dbSchema = new DbSchema(idGenerator.getNextId(), connection);
 			setTransactionFields(dbSchema);
 			group.sendToBackups(dbSchema);
@@ -364,7 +328,9 @@ public class ShadowDBServer {
 
 			ResultSet rowSet;
 
-			// Send the table rows.
+			/**
+			 * Send the content of each table in batches of rows.
+			 */
 			for (String table : dbSchema.getTables().keySet()) {
 				RowBatch rows;
 				boolean firstBatch = true;
@@ -372,13 +338,16 @@ public class ShadowDBServer {
 				/**
 				 * Compute how many rows per batch to send such that
 				 * a batch of rows takes not more than the maximum allowed
-				 * message size in serialized form.
+				 * message size in serialized form. We conservatively assume that
+				 * Java serialization imposes a 100% overhead.
 				 */
-				int batchSize = ShadowDBConfig.getMaxMsgSize() /
-					(ShadowDBConfig.getMaxDbCellSize() * dbSchema.getTables().get(table).size());
+				int batchSize = Math.round((ShadowDBConfig.getMaxMsgSize() /
+					(dbSchema.getLargestCellSize(table) * dbSchema.getTables().get(table).size())) * 0.5f);
 
 				Statement stmt = connection.createStatement();
 				rowSet = stmt.executeQuery("select * from " + table);
+
+				LOG.info(dbIdToString() + " Sending database snapshot...");
 
 				do {
 					rows = new RowBatch(idGenerator.getNextId(), table,
@@ -387,7 +356,6 @@ public class ShadowDBServer {
 
 					setTransactionFields(rows);
 					group.sendToBackups(rows);
-
 				} while (!rows.lastTableRows());
 
 				rowSet.close();
@@ -396,6 +364,8 @@ public class ShadowDBServer {
 
 			connection.commit();
 			nextSeqNo++;
+
+			LOG.info(dbIdToString() + " finished state transfer to backups");
 		}
 	}
 
@@ -422,6 +392,8 @@ public class ShadowDBServer {
 				schema.executeSql(connection);
 				connection.commit();
 
+				LOG.info(dbIdToString() + " receiving database snapshot...");
+
 				// Populate each table
 				for (int i = 0; i < schema.getTables().size(); i++) {
 					RowBatch rows;
@@ -429,24 +401,21 @@ public class ShadowDBServer {
 					do {
 						rows = (RowBatch) group.receiveFromPrimary();
 						rows.executeSql(connection);
-
 					} while (!rows.lastTableRows());
 				}
 
 				// Swap the received snapshot with our database.
 				schema.installSchema(connection, dbType);
+				connection.commit();
+
+				LOG.info(dbIdToString() + " received database snapshot.");
 
 			} else {
-				if (transMode == ShadowDBConfig.TRANS_MODE_TYPE.TWO_PHASE) {
-					executeTransactions2Phase(t, connection, now);
-				} else {
-					executeTransactionsSql(t, connection, now);
-				}
+				executeTransactionsSql(t, connection, now);
 				connection.commit();
 			}
 
 			group.sendToPrimary(t.getId());
-			gcTransactions(now);
 			nextSeqNo++;
 
 		} else {
@@ -469,11 +438,7 @@ public class ShadowDBServer {
 				id2IdMap.put(t.getId(), t.getId());
 			}
 
-			if (transMode == ShadowDBConfig.TRANS_MODE_TYPE.TWO_PHASE) {
-				executeTransactions2Phase(batch, connection, now);
-			} else {
-				executeTransactionsSql(batch, connection, now);
-			}
+			executeTransactionsSql(batch, connection, now);
 			connection.commit();
 
 			if (replicated) {
@@ -491,7 +456,6 @@ public class ShadowDBServer {
 				}
 			}
 		}
-		gcTransactions(now);
 	}
 
 	/**
@@ -583,7 +547,7 @@ public class ShadowDBServer {
 				for (;;) {
 					ShadowTransaction t = (ShadowTransaction) clientSocket.readObject();
 
-					QueryResult result = TRANS_EXECUTED.get(t.getId());
+					QueryResult result = TRANS_EXECUTED.remove(t.getId());
 
 					// Has the transaction already been executed?
 					if (result == null) {
@@ -595,9 +559,8 @@ public class ShadowDBServer {
 								t.getId().wait();
 							}
 						}
-						result = TRANS_EXECUTED.get(t.getId());
+						result = TRANS_EXECUTED.remove(t.getId());
 					}
-
 					clientSocket.writeObject(result);
 				}
 			} catch (Exception e) {

@@ -115,6 +115,7 @@ public class RowBatch extends ShadowTransaction {
 			addRows(rowSet, maxRowCount);
 		} else {
 			this.rows = new Object[0][0];
+			this.lastTableRows = true;
 		}
 	}
 
@@ -269,18 +270,7 @@ public class RowBatch extends ShadowTransaction {
 			}
 		} catch (Exception e) {
 			LOG.warning("Caught exception: " + e + " while executing RowBatch transaction: " + super.id);
-			e.printStackTrace();
 		}
 		return new QueryResult();
-	}
-
-	@Override
-	public QueryResult executeQuery(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public boolean executeUpdate(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
 	}
 }

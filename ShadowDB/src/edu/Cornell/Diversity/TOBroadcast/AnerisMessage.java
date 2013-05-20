@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import edu.Cornell.Diversity.Utils.DbUtils;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 
 /**
@@ -106,7 +107,7 @@ public class AnerisMessage {
 		.append("{axiom:OPID}())))))").toString();
 
 	public static enum ANERIS_MSG_TYPE {
-		BCAST("bcast"), SWAP("swap"), DUMMY("dummy");
+		BCAST("bcast"), SWAP("swap"), DUMMY("bcast");
 
 		private String name;
 
@@ -151,11 +152,17 @@ public class AnerisMessage {
 	 */
 	private long slot;
 
-	public AnerisMessage(PROTOCOL_TYPE protocol) {
+	private AnerisMessage(PROTOCOL_TYPE protocol) {
 		this.msgType = ANERIS_MSG_TYPE.SWAP;
 		this.protocol = protocol;
 		this.proposerId = FAKE_ID;
-		this.uid = id.incrementAndGet();
+	}
+
+	public AnerisMessage(PROTOCOL_TYPE protocol, int proposerId) {
+		this.msgType = ANERIS_MSG_TYPE.SWAP;
+		this.protocol = protocol;
+		this.proposerId = FAKE_ID;
+		this.uid = proposerId * 100000000L + id.incrementAndGet();
 	}
 
 	public AnerisMessage(LinkedList<IdIpPort> members, long seqNo, String proposerId) {
@@ -163,7 +170,7 @@ public class AnerisMessage {
 		this.members = members;
 		this.seqNo = seqNo;
 		this.proposerId = proposerId;
-		this.uid = id.incrementAndGet(); //extractIdNo(proposerId) * 1000000000L + id.incrementAndGet();
+		this.uid = DbUtils.extractIntFromId(proposerId) * 100000000L + id.incrementAndGet();
 	}
 
 	/**
@@ -172,7 +179,7 @@ public class AnerisMessage {
 	public AnerisMessage(String proposerId) {
 		this.msgType = ANERIS_MSG_TYPE.DUMMY;
 		this.proposerId = proposerId;
-		this.uid = id.incrementAndGet();
+		this.uid = DbUtils.extractIntFromId(proposerId) * 100000000L + id.incrementAndGet();
 	}
 
 	public static AnerisMessage parseConfiguration(String configuration) {
@@ -205,7 +212,7 @@ public class AnerisMessage {
 	}
 
 	/**
-	 * Parses an aneris message when it contains a protocol.
+	 * Parses an Aneris message when it contains a protocol.
 	 */
 	private static AnerisMessage parseProtocol(String msg) {
 		PROTOCOL_TYPE protocol = null;

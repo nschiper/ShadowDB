@@ -67,10 +67,14 @@ public class DbSchema extends ShadowTransaction {
 
 	private HashMap<String, LinkedHashMap<String, String>> tables;
 
-	//The precision of columns of each table.
+	/**
+	 * The precision of columns of variable length.
+	 */
 	private HashMap<String, LinkedHashMap<String, Integer>> precision;
 
-	// The set of primary keys.
+	/**
+	 * The set of primary keys.
+	 */
 	private HashMap<String, HashSet<String>> primaryKeys;
 
 	public DbSchema(TransactionId id, Connection connection) throws SQLException {
@@ -194,7 +198,6 @@ public class DbSchema extends ShadowTransaction {
 			Statement stmt = connection.createStatement();
 
 			String createTable = buildTableStatement(table, tables.get(table));
-			System.out.println("table: " + createTable);
 			stmt.executeUpdate(createTable);
 			stmt.close();
 		}
@@ -205,8 +208,6 @@ public class DbSchema extends ShadowTransaction {
 	 * In other words, this method removes the "tmp" extensions.
 	 */
 	public void installSchema(Connection connection, DB_TYPE dbType) throws SQLException {
-		System.out.println("Install schema at: " + System.currentTimeMillis());
-
 		for (String table : tables.keySet()) {
 			Statement stmt = connection.createStatement();
 
@@ -258,13 +259,77 @@ public class DbSchema extends ShadowTransaction {
 		return sb.toString();
 	}
 
-	@Override
-	public QueryResult executeQuery(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
+	/**
+	 * Returns the number of bytes of the "biggest" cell of a given table.
+	 */
+	public int getLargestCellSize(String table) {
+		int maxSize = 0;
+
+		for (String column : tables.get(table).keySet()) {
+			String columnType = tables.get(table).get(column);
+
+			if (getSize(column, columnType, table) > maxSize) {
+				maxSize = getSize(column, columnType, table);
+			}
+		}
+		return maxSize;
 	}
 
-	@Override
-	public boolean executeUpdate(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
+	/**
+	 * Returns the number of bytes of a cell of a given column
+	 * in a given table.
+	 */
+	private int getSize(String column, String columnType, String table) {
+		if (columnType.equals("INTEGER")) {
+			return 4;
+		} else if (columnType.equals("BIGINT")) {
+			return 8;
+		} else if (columnType.equals("FLOAT")) {
+			return 8;
+		} else if (columnType.equals("DOUBLE")) {
+			return 8;
+
+		} else if (columnType.equals("CHAR")) {
+			Integer columnPrecision = precision.get(table).get(column);
+			if (columnPrecision != null) {
+				// To be safe, we consider that each character takes 2 bytes.
+				return 2 * columnPrecision;
+			} else {
+				return 2;
+			}
+
+		} else if (columnType.equals("BOOLEAN")) {
+			return 1;
+		} else if (columnType.equals("DATE")) {
+			// There is at most 24 characters of 2 bytes.
+			return 48;
+		} else if (columnType.equals("VARCHAR")) {
+
+			Integer columnPrecision = precision.get(table).get(column);
+			if (columnPrecision != null) {
+				// To be safe, we consider that each character takes 2 bytes.
+				return 2 * columnPrecision;
+			} else {
+				return 2;
+			}
+
+		} else if (columnType.equals("TIMESTAMP")) {
+			return 8;
+		} else if (columnType.equals("DECIMAL")) {
+			// 41 characters of 2 bytes.
+			return 82;
+		} else if (columnType.equals("CHARACTER")) {
+
+			Integer columnPrecision = precision.get(table).get(column);
+			if (columnPrecision != null) {
+				// To be safe, we consider that each character takes 2 bytes.
+				return 2 * columnPrecision;
+			} else {
+				return 2;
+			}
+
+		} else {
+			throw new IllegalArgumentException("Unsupported column type: " + columnType);
+		}
 	}
 }

@@ -61,7 +61,7 @@ import edu.Cornell.Diversity.Utils.TransactionIdGenerator;
  */
 public class BankingApp extends Thread {
 
-	private static final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.Client.BankingApp");
+	private static final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.Test.BankingApp");
 
 	public static final String TABLE_NAME = "ACCOUNTS";
 
@@ -78,8 +78,6 @@ public class BankingApp extends Thread {
 
 	private final LinkedList<Long> latencies;
 
-	private final CLIENT_TYPE clientType;
-
 	/**
 	 * True if read-only transactions will be executed
 	 */
@@ -94,11 +92,9 @@ public class BankingApp extends Thread {
 	 */
 	private DBConnection dbConnection;
 
-	public BankingApp(int clientNo, String configFile, CLIENT_TYPE clientType,
-		boolean readOnly, int accountCount) throws Exception {
+	public BankingApp(int clientNo, String configFile, boolean readOnly, int accountCount) throws Exception {
 
 		this.clientId = "BankingApp-" + clientNo;
-		this.clientType = clientType;
 		this.readOnly = readOnly;
 		this.accountCount = accountCount;
 		this.noExecutedTrans = new AtomicInteger(0);
@@ -137,57 +133,31 @@ public class BankingApp extends Thread {
 
 	public void run() {
 
-		int nbTransToExec;
-
-		if (readOnly) {
-			nbTransToExec = 30000;
-		} else if (clientType == CLIENT_TYPE.WARMUP) {
-			nbTransToExec = 10000;
-		} else {
-			nbTransToExec = 10000;				
-		}
+		int nbTransToExec = 10000;
 
 		TransactionIdGenerator idGenerator = new TransactionIdGenerator();
 
-		if (clientType == CLIENT_TYPE.POPULATE) {
-			PopulateBankDBTransaction populateTrans = new PopulateBankDBTransaction(idGenerator.getNextId(), accountCount);
+		Random rnd = new Random(System.currentTimeMillis());
+		long start = System.currentTimeMillis();
+		ShadowTransaction toExecute = null;
 
-			try {
-				dbConnection.submit(populateTrans);
-			} catch (Exception e) {
-				LOG.warning("Unable to populate bank database, caught exception: " + e);
-			}
-			LOG.info("Successfully populated the database");
+		for (int i = noExecutedTrans.get(); i < nbTransToExec; i++) {
+			toExecute = generateNextTransaction(readOnly, idGenerator, rnd);
 
-		} else {
-			Random rnd = new Random(System.currentTimeMillis());
-			long start = System.currentTimeMillis();
-			ShadowTransaction toExecute = null;
-	
-			while (noExecutedTrans.get() < nbTransToExec) {
-				try {
-					for (int i = noExecutedTrans.get(); i <= nbTransToExec; i++) {
-						if (toExecute == null) {
-							toExecute = generateNextTransaction(readOnly, idGenerator, rnd);
-						}
-						long startExec = System.currentTimeMillis();
-						dbConnection.submit(toExecute);
-						long endExec = System.currentTimeMillis();
-						latencies.add(endExec - startExec);
+			long startExec = System.currentTimeMillis();
+			dbConnection.submit(toExecute);
+			long endExec = System.currentTimeMillis();
+			latencies.add(endExec - startExec);
 
-						toExecute = null;
-
-						noExecutedTrans.set(i);
-					}
-				} catch (Exception e) {
-					LOG.warning("Caught exception: " + e + " in BankingApp");
-				}
-			}
-			long end = System.currentTimeMillis();
-			long totalTime = end - start;
-			this.averageThroughput = ((float) nbTransToExec) / ((float) totalTime) * 1000f;
-			this.averageLatency = ((float) totalTime) / ((float) nbTransToExec);
+			noExecutedTrans.set(i);
 		}
+
+		LOG.info("Client: " + clientId + " done executing transactions!");
+
+		long end = System.currentTimeMillis();
+		long totalTime = end - start;
+		this.averageThroughput = ((float) nbTransToExec) / ((float) totalTime) * 1000f;
+		this.averageLatency = ((float) totalTime) / ((float) nbTransToExec);
 
 		try {
 			dbConnection.close();
@@ -198,9 +168,9 @@ public class BankingApp extends Thread {
 	}
 
 	/**
-	 * Prints the 10, 50, and 90 percentiles.
+	 * Prints the 10, 50, 90, and 99 percentiles.
 	 */
-	private static void printLatPercentiles(LinkedList<Long> latencies) {
+	private static void printLatencyPercentiles(LinkedList<Long> latencies) {
 
 		Collections.sort(latencies);
 	
@@ -210,18 +180,21 @@ public class BankingApp extends Thread {
 		int ninetiethPercentileIndex = (9 * latencies.size()) / 10;
 		int ninenytNinePercentile = (99 * latencies.size()) / 100;
 
+		StringBuffer sb = new StringBuffer();
+
 		for (long latency : latencies) {
 			if (tenthPercentileIndex == index) {
-				LOG.info("\t 10% of latencies are below: " + latency);
+				sb.append("\t 10% of latencies are below: " + latency + "\n");
 			} else if (medianIndex == index) {
-				LOG.info("\t 50% of latencies are below: " + latency);				
+				sb.append("\t 50% of latencies are below: " + latency + "\n");				
 			} else if (ninetiethPercentileIndex == index) {
-				LOG.info("\t 90% of latencies are below: " + latency);				
+				sb.append("\t 90% of latencies are below: " + latency + "\n");	
 			} else if (ninenytNinePercentile == index) {
-				LOG.info("\t 99% of latencies are below: " + latency);
+				sb.append("\t 99% of latencies are below: " + latency + "\n");
 			}
 			index++;
 		}
+		LOG.info(sb.toString());
 	}
 
 	private static void runClients(String configFile, int clientCount, CLIENT_TYPE clientType,
@@ -230,8 +203,14 @@ public class BankingApp extends Thread {
 		BankingApp[] clients = new BankingApp[clientCount];
 
 		for (int i = 0; i < clientCount; i++) {
-			clients[i] = new BankingApp(i, configFile, clientType, readOnly, accountCount);
+			clients[i] = new BankingApp(i, configFile, readOnly, accountCount);
 			clients[i].start();
+		}
+
+		if (clientType == CLIENT_TYPE.BENCHMARK) {
+			LOG.info("Started experiment with " + clientCount + " clients");
+		} else if (clientType == CLIENT_TYPE.WARMUP) {
+			LOG.info("Warming up database with " + clientCount + " clients");
 		}
 
 		for (int i = 0; i < clientCount; i++) {
@@ -250,12 +229,26 @@ public class BankingApp extends Thread {
 				allLatencies.addAll(clients[i].latencies);
 			}
 			String operationType = (readOnly ? "read-only" : "update");
-			LOG.info(" *** Benchmark results for " + clientCount + " " + operationType + " clients:");
-			LOG.info("\t throughput: " + throughput + " TPS, avrg. latency: " + latency + " ms");
+			StringBuffer sb = new StringBuffer();
+			sb.append(" *** Benchmark results for " + clientCount + " " + operationType + " clients:\n");
+			sb.append("\t throughput: " + throughput + " TPS, avrg. latency: " + latency + " ms");
+			LOG.info(sb.toString());
 
 			Collections.sort(allLatencies);
-			printLatPercentiles(allLatencies);
+			printLatencyPercentiles(allLatencies);
 		}
+	}
+
+	public void populateDb() {
+		TransactionId id = new TransactionId("myIp", Thread.currentThread().getId(), 0);
+		PopulateBankDBTransaction populateTrans = new PopulateBankDBTransaction(id, accountCount);
+
+		try {
+			dbConnection.submit(populateTrans);
+		} catch (Exception e) {
+			LOG.warning("Unable to populate bank database, caught exception: " + e);
+		}
+		LOG.info("Successfully populated the database");
 	}
 
 	public static void main(String[] args) {
@@ -269,13 +262,21 @@ public class BankingApp extends Thread {
 				int maxClientCount = Integer.parseInt(args[4]);
 				int clientIncrement = Integer.parseInt(args[5]);
 
-				LOG.info("Started Banking app with parameters: ");
-				LOG.info("\t config file: " + configFile);
-				LOG.info("\t read only: " + readOnly);
-				LOG.info("\t acount count: " + accountCount);
-				LOG.info("\t min clients: " + minClientCount);
-				LOG.info("\t max client: " + maxClientCount);
-				LOG.info("\t clientIncrement: " + clientIncrement);
+				String config = "Started Banking app with parameters: \n"
+					+ "\t config file: " + configFile + "\n"
+					+ "\t read only: " + readOnly + "\n"
+					+ "\t acount count: " + accountCount + "\n"
+					+ "\t min clients: " + minClientCount + "\n"
+					+ "\t max client: " + maxClientCount + "\n"
+					+ "\t clientIncrement: " + clientIncrement;
+				LOG.info(config);
+
+				/**
+				 * Populate database.
+				 */
+				BankingApp app = new BankingApp(0 /*clientNo */, configFile, readOnly, accountCount);
+				app.populateDb();
+				app.dbConnection.close();
 
 				/**
 				 * Warm up database.
@@ -283,6 +284,9 @@ public class BankingApp extends Thread {
 				runClients(configFile, 5 /* clientCount */, CLIENT_TYPE.WARMUP,
 					false /* read-only? */, accountCount, false /* showResults */);
 
+				/**
+				 * Run benchmark.
+				 */
 				for (int i = minClientCount; i <= maxClientCount; i += clientIncrement) {
 					runClients(configFile, i /* clientCount */, CLIENT_TYPE.BENCHMARK,
 						readOnly, accountCount, true /* showResults */);
@@ -294,7 +298,7 @@ public class BankingApp extends Thread {
 					+ ", the min/max client count, and the client count increment.");
 			}
 		} catch (Exception e) {
-			LOG.warning("Unable to start BankingApp, caught excpetion: " + e);
+			LOG.warning("Unable to start BankingApp, caught exception: " + e);
 		}		
 	}
 }

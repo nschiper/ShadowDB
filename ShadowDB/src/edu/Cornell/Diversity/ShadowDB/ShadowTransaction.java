@@ -44,15 +44,10 @@ import java.sql.SQLException;
 
 /**
  * A class representing a transaction sent to ShadowDB. Subclasses must
- * implement executeSQL and executeQuery/executeUpdate. The first method
- * contains the entire code to be executed by the transaction. The last two methods
- * should be implemented if the transaction fits the two-phase model, where
- * in the first phase queries are executed, and in the second phase only updates
- * are applied to the database. The query phase must fully determine the update
- * phase. Parameters of the update phase are typically stored as instance
- * variables of the subclass.
+ * implement executeSQL. This method contains the entire code to be executed by
+ * the transaction.
  * 
- * Neither commit nor rollback should be called inside these methods. The replication
+ * Neither commit nor rollback should be called inside this method. The replication
  * protocol is in charge of terminating the transactions.
  * 
  * @author nschiper@.cs.cornell.edu
@@ -68,8 +63,8 @@ public abstract class ShadowTransaction implements Serializable {
 	/**
 	 * A unique sequence number assigned to this transaction. This integer
 	 * represents the global sequence number at which this transaction
-	 * is to be executed against the database. Hence, this sequence number totally
-	 * orders the transaction execution.
+	 * is to be executed against the databases. Hence, this sequence number totally
+	 * orders transactions.
 	 */
 	private long sequenceNo = 0;
 
@@ -120,12 +115,4 @@ public abstract class ShadowTransaction implements Serializable {
 	 * An implementation of this method should not call commit nor rollback on the connection.
 	 */
 	public abstract QueryResult executeSql(Connection connection) throws SQLException;
-
-	/**
-	 * executeQuery and executeUpdate should be implemented by two-phase transactions,
-	 * where in the first phase a sequence of queries
-	 * are executed that completely determine the updates to execute.
-	 */
-	public abstract QueryResult executeQuery(Connection connection) throws SQLException;
-	public abstract boolean executeUpdate(Connection connection) throws SQLException;
 }

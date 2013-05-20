@@ -112,4 +112,13 @@ public class DbUtils {
 		}
 		return false;
 	}
+
+	public static int extractIntFromId(String id) {
+		for (int i = id.length() - 1; i >= 0; i--) {
+			if (!Character.isDigit(id.charAt(i))) {
+				return Integer.parseInt(id.substring(i + 1));
+			}
+		}
+		throw new IllegalArgumentException("Identifier: " + id + " does not contain an integer");
+	}
 }

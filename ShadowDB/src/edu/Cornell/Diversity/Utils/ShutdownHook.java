@@ -66,7 +66,7 @@ public class ShutdownHook {
 
 	/**
 	 * Installs a shutdown hook that properly closes the registered
-	 * sockets.
+	 * sockets and databases.
 	 */
 	public static void installHook() {
 

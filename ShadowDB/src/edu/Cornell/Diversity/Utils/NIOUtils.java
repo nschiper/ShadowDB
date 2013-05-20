@@ -63,12 +63,12 @@ public class NIOUtils {
 	/**
 	 *  The number of bytes of a long.
 	 */
-	public static final int NO_BYTES_LONG = Long.SIZE / 8;
+	public static final int BYTE_COUNT_LONG = Long.SIZE / 8;
 
 	/**
 	 * The number of bytes of an int.
 	 */
-	public static final int NO_BYTES_INT = Integer.SIZE / 8;
+	public static final int BYTE_COUNT_INT = Integer.SIZE / 8;
 
 	/**
 	 * An error indicating that a header could not be read.
@@ -80,10 +80,10 @@ public class NIOUtils {
 	/**
 	 * When reading from an Aneris channel, we will retry a couple
 	 * of times before giving up and considering the other end crashed.
-	 * More specifically, we will retry {@code RETRIAL_COUNT} times and
+	 * More specifically, we will retry {@code RETRY_COUNT} times and
 	 * sleep {@code SLEEP_TIME_BETWEEN_TRIALS} number of times.
 	 */
-	private static final int RETRIAL_COUNT = 10;
+	private static final int RETRY_COUNT = 10;
 	private static final int SLEEP_TIME_BETWEEN_TRIALS = 1000;
 
 	/**
@@ -137,13 +137,13 @@ public class NIOUtils {
 
 		long bytesTransfered = 0;
 
-		while (bytesTransfered <  (nbBytes + NO_BYTES_LONG)) {
+		while (bytesTransfered <  (nbBytes + BYTE_COUNT_LONG)) {
 			if (bytesTransfered != 0) {
 				buffer.clear();
 			}
 
 			// Make sure we do not read too much from the channel
-			long noBytesRemaining = (nbBytes + NO_BYTES_LONG) - bytesTransfered;
+			long noBytesRemaining = (nbBytes + BYTE_COUNT_LONG) - bytesTransfered;
 
 			if (noBytesRemaining < buffer.capacity()) {
 				// Buffers are never bigger than 2GB, it is
@@ -189,7 +189,7 @@ public class NIOUtils {
 	 */
 	public static long readHeader(ReadableByteChannel from, ByteBuffer buffer) throws IOException {
 		buffer.clear();
-		buffer.limit(NO_BYTES_LONG);
+		buffer.limit(BYTE_COUNT_LONG);
 
 		while(buffer.hasRemaining()) {
 			if (from.read(buffer) < 0) {
@@ -207,7 +207,7 @@ public class NIOUtils {
 	 * {@code ERROR_HEADER_INT} is returned.
 	 * 
 	 * <p> This method uses an "ad-hoc" way to detect that the end host crashed: if after reading data
-	 * {@value #RETRIAL_COUNT} times from the channel (and sleeping {@value #SLEEP_TIME_BETWEEN_TRIALS} ms between
+	 * {@value #RETRY_COUNT} times from the channel (and sleeping {@value #SLEEP_TIME_BETWEEN_TRIALS} ms between
 	 * trials) no bytes could be read, we consider the end host dead and return {@code ERROR_HEADER_INT}.
 	 */
 	public static int readAnerisHeader(ReadableByteChannel from, ByteBuffer buffer) throws Exception {
@@ -225,7 +225,7 @@ public class NIOUtils {
 				if (bytesRead == 0) {
 					Thread.sleep(SLEEP_TIME_BETWEEN_TRIALS);
 					trialNo++;
-					if (trialNo == RETRIAL_COUNT) {
+					if (trialNo == RETRY_COUNT) {
 						return ERROR_HEADER_INT;
 					}
 				}
@@ -247,7 +247,7 @@ public class NIOUtils {
 	 * <p> Reads the next Aneris message from this channel and returns it in String form.
 	 * 
 	 * <p> This method uses an "ad-hoc" way to detect that the end host crashed: if after reading data
-	 * {@value #RETRIAL_COUNT} times from the channel (and sleeping {@value #SLEEP_TIME_BETWEEN_TRIALS} ms between
+	 * {@value #RETRY_COUNT} times from the channel (and sleeping {@value #SLEEP_TIME_BETWEEN_TRIALS} ms between
 	 * trials) no bytes could be read, we consider the end host dead and return null.
 	 * 
 	 * <p> This method also returns null if the other end closes the connection before we read
@@ -268,7 +268,7 @@ public class NIOUtils {
 			while (buffer.hasRemaining()) {
 				int bytesRead = chan.read(buffer);
 				if (bytesRead == 0) {
-					if (trialNo < RETRIAL_COUNT) {
+					if (trialNo < RETRY_COUNT) {
 						trialNo++;
 						Thread.sleep(SLEEP_TIME_BETWEEN_TRIALS);
 					} else {
@@ -301,7 +301,7 @@ public class NIOUtils {
 		AtomicBoolean endPointCrashed) throws Exception {
 
 		buffer.clear();
-		buffer.limit(NO_BYTES_LONG);
+		buffer.limit(BYTE_COUNT_LONG);
 
 		if (chan.read(buffer) > 0) {
 			while (buffer.hasRemaining()) {
@@ -318,6 +318,7 @@ public class NIOUtils {
 				if (chan.read(buffer) <= 0 && endPointCrashed.get()) {
 					return null;
 				}
+
 			}
 			buffer.flip();
 			return deserializeObject(buffer);
@@ -372,11 +373,11 @@ public class NIOUtils {
 		objOutputStream.close();
 
 		if (markEndOfHeader) {
-			if ((objAsByteArray.length + NO_BYTES_LONG + Byte.SIZE) > buffer.capacity()) {
+			if ((objAsByteArray.length + BYTE_COUNT_LONG + Byte.SIZE) > buffer.capacity()) {
 				return false;
 			}
 		} else {
-			if ((objAsByteArray.length + NO_BYTES_LONG) > buffer.capacity()) {
+			if ((objAsByteArray.length + BYTE_COUNT_LONG) > buffer.capacity()) {
 				return false;
 			}
 		}

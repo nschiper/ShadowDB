@@ -47,7 +47,7 @@ import edu.Cornell.Diversity.ResilientTCP.SuspectedCrashException;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 
 /**
- * This class models a connection to the ShadowDB database replicated with primary backup. An instance of this class
+ * This class models a connection to the ShadowDB database replicated with primary-backup. An instance of this class
  * is bound to a group of replica, and allows to submit transactions.
  * If the ShadowDB primary fails, any in-flight transaction will be resubmitted to the next
  * primary automatically.
@@ -79,28 +79,22 @@ public class ShadowDBConnection implements DBConnection {
 		this.allDbs = allDbs;
 		this.indexPrimary = -1;
 		connectToPrimary();
-
-		if (this.primarySocket == null) {
-			throw new IllegalStateException("Unable to connect to the primary, list of databases: " + allDbs);
-		} else {
-			LOG.info("Opened connection to the ShadowDB primary: " + primarySocket.getEndPointId());
-		}
 	}
 
 	private void connectToPrimary() {
 
-		indexPrimary++;
+		boolean connected = false;
 
-		for (;indexPrimary < allDbs.size(); indexPrimary++) {
+		while (!connected) {
 			try {
+				indexPrimary = (indexPrimary + 1) % (allDbs.size() - 1);
 				IdIpPort db = allDbs.get(indexPrimary);
-				System.out.println("Trying to connect to: " + db);
 
-				primarySocket = FailFastSocket.newInstanceWithRetries(db.getIp(), db.getPort(),
-					db.getId(), clientId, 3);
+				LOG.info("Connecting to primary: " + db);
+				primarySocket = FailFastSocket.newInstance(db.getIp(), db.getPort(), clientId, db.getId());
+				LOG.info("Connected to the ShadowDB primary: " + db.getId());
+				connected = true;
 
-				LOG.info("Client: " + clientId + " connected to primary: " + primarySocket.getEndPointId());
-				return;
 			} catch (SuspectedCrashException sce) {
 				// If we suspect the primary to have crashed, connect to a new one...
 				try {
@@ -121,26 +115,25 @@ public class ShadowDBConnection implements DBConnection {
 		QueryResult queryResult = null;
 		boolean done = false;
 
-		/**
-		 * We keep on retransmitting the transaction while we get
-		 * 2f+1 properly signed identical answers.
-		 * TODO: send the transaction to a backup if the answers
-		 * are not identical or they are not properly signed.
-		 */
 		while (!done) {
 			try {
 				primarySocket.writeObject(t);
 				queryResult = (QueryResult) primarySocket.readObject();
+
 				done = true;
 			} catch (Exception e) {
 				if (e instanceof SuspectedCrashException) {
-					// If we suspect the primary to have crashed, connect to a new one...
+					/**
+					 * If we suspect the primary to have crashed, connect to a new one...
+					 */
 					SuspectedCrashException sce = (SuspectedCrashException) e;
 					LOG.info("\n Suspected crash of primary: " + sce.getId() + "\n");
 
-					// Waiting until the new replica configuration is installed
+					/**
+					 * Waiting until the new replica configuration is installed.
+					 */
 					try {
-						Thread.sleep(15000);
+						Thread.sleep(ShadowDBConfig.getGroupReconfigurationTime());
 					} catch (InterruptedException ie) {
 						// There's not much to be done here...
 					}
@@ -157,7 +150,6 @@ public class ShadowDBConnection implements DBConnection {
 		primarySocket.close();
 	}
 
-	@Override
 	public Connection getConnection() {
 		throw new UnsupportedOperationException();
 	}

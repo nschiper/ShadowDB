@@ -70,7 +70,7 @@ public class BalanceTransaction extends ShadowTransaction {
 		this.accounts = new int[accounts.length];
 
 		for (int i = 0; i < accounts.length; i++) {
-			accounts[i] = accounts[i];
+			this.accounts[i] = accounts[i];
 		}
 	}
 
@@ -83,6 +83,7 @@ public class BalanceTransaction extends ShadowTransaction {
 		for (int i = 0; i < accounts.length; i++) {
 			sqlStatement.setInt(1, accounts[i]);
 			ResultSet resultSet = sqlStatement.executeQuery();
+			
 			queryResult.addResultSet(resultSet);
 			resultSet.close();
 		}
@@ -100,15 +101,5 @@ public class BalanceTransaction extends ShadowTransaction {
 		}
 		sb.append(")");
 		return sb.toString();
-	}
-
-	@Override
-	public QueryResult executeQuery(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public boolean executeUpdate(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
 	}
 }

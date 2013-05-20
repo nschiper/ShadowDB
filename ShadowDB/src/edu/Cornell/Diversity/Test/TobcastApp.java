@@ -39,7 +39,6 @@
 package edu.Cornell.Diversity.Test;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.logging.Logger;
 
@@ -57,11 +56,8 @@ import edu.Cornell.Diversity.Utils.IdIpPort;
  */
 public class TobcastApp extends Thread {
 
-	private static final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.Client.TobcastApp");
+	private static final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.Test.TobcastApp");
 
-	private static final int BCAST_WARM_COUNT = 100;
-
-	private final LinkedList<IdIpPort> databases;
 	private final int clientId;
 	private final int bcastCount;
 	private final TobcastClient tobcast;
@@ -70,8 +66,7 @@ public class TobcastApp extends Thread {
 	private float throughput;
 	private final LinkedList<Long> latencies;
 
-	public TobcastApp(String configFile, int clientId, int bcastCount,
-		PROTOCOL_TYPE protocol, boolean changeProtocol, boolean warmup) {
+	public TobcastApp(String configFile, int clientId, int bcastCount, PROTOCOL_TYPE protocol, boolean changeProtocol) {
 
 		this.clientId = clientId;
 		this.bcastCount = bcastCount;
@@ -80,15 +75,11 @@ public class TobcastApp extends Thread {
 			ConfigurationParser configParser = new ConfigurationParser(configFile);
 			LinkedList<IdIpPort> tobcastServers = configParser.getToBCastServers();
 
-			int clientPort = TobcastClient.EXTERNAL_CLIENT;
-			if (warmup) {
-				clientPort = configParser.getPortFromId("client" + this.clientId);
-				tobcast = TobcastClient.newInstance(tobcastServers, clientPort);
-			} else {
-				tobcast = TobcastClient.newInstance(tobcastServers, clientPort, BCAST_WARM_COUNT + 1 /*startSlot */);
+			Integer clientPort = configParser.getPortFromId("client" + this.clientId);
+			if (clientPort == null) {
+				clientPort = TobcastClient.EXTERNAL_CLIENT;
 			}
-
-			databases = configParser.getDbServers();
+			tobcast = TobcastClient.newInstance(tobcastServers, clientPort, clientId);
 			configParser.closeConfigFile();
 
 			latencies = new LinkedList<Long>();
@@ -96,26 +87,15 @@ public class TobcastApp extends Thread {
 			throughput = 0f;
 
 			if (changeProtocol) {
-				AnerisMessage chgProtocol = new AnerisMessage(protocol);
+				AnerisMessage chgProtocol = new AnerisMessage(protocol, clientId);
 				tobcast.toBcast(chgProtocol);
 				LinkedList<AnerisMessage> confirmation = tobcast.deliver();
 				LOG.info("Changed protocol to: " + confirmation);
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
 			throw new IllegalArgumentException("Unable to parse config. file: " + configFile +
 				" caught exception: " + e);
 		}
-	}
-
-	public TobcastApp(int clientId, int bcastCount, TobcastClient tobcast, LinkedList<IdIpPort> dbs) {
-		this.clientId = clientId;
-		this.bcastCount = bcastCount;
-		this.tobcast = tobcast;
-		this.databases = dbs;
-		this.latencies = new LinkedList<Long>();
-		this.latency = 0f;
-		this.throughput = 0f;
 	}
 
 	public void run() {
@@ -126,18 +106,10 @@ public class TobcastApp extends Thread {
 
 		int slotNo = 1;
 		int myDeliveredCount = 0;
-		boolean experimentFinished = false;
 		int totalMsgDelivered = 0;
-
-		LinkedList<Integer> keysToRead = new LinkedList<Integer>();
-		HashMap<Integer, Integer> keysToWrite = new HashMap<Integer, Integer>();
-
-		keysToRead.add(1);
-		keysToWrite.put(1, 120);
-
 		long start = System.currentTimeMillis();
 
-		while (slotNo < bcastCount && !experimentFinished) {
+		while (myDeliveredCount < bcastCount) {
 			msg = new AnerisMessage(myId);
 
 			long bcastTime = System.nanoTime();
@@ -150,11 +122,6 @@ public class TobcastApp extends Thread {
 				if (msgs != null) {
 					slotNo++;
 					totalMsgDelivered += msgs.size();
-
-					if (slotNo > bcastCount) {
-						experimentFinished = true;
-						break;
-					}
 
 					for (AnerisMessage delivered : msgs) {
 						proposerId = delivered.getProposerId();
@@ -179,8 +146,7 @@ public class TobcastApp extends Thread {
 		long end = System.currentTimeMillis();
 
 		LOG.info("Client " + clientId + " broadcast " + myDeliveredCount + " msgs" +
-				" average batch size: " + ((float) totalMsgDelivered) / ((float) slotNo)
-				+ " slot no: " + slotNo);
+				" average batch size: " + ((float) totalMsgDelivered) / ((float) slotNo));
 		latency = ((float) (end - start)) / ((float) myDeliveredCount);
 		throughput = ((float) myDeliveredCount) / ((float) (end-start)) * 1000f;
 		LOG.info("Client " + clientId + " latency " + latency + " throughput " + throughput);
@@ -205,22 +171,24 @@ public class TobcastApp extends Thread {
 		int lastLatency = latencies.size() - 1;
 		float avrgLatency = 0f;
 
+		StringBuffer sb = new StringBuffer();
 		for (long latency : latencies) {
 			if (tenthPercentileIndex == index) {
-				LOG.info("\t 10% of latencies are below: " + (latency / 1000000) + " ms");
+				sb.append("\t 10% of latencies are below: " + (latency / 1000000) + " ms \n");
 			} else if (medianIndex == index) {
-				LOG.info("\t 50% of latencies are below: " + (latency / 1000000) + " ms");				
+				sb.append("\t 50% of latencies are below: " + (latency / 1000000) + " ms \n");
 			} else if (ninetiethPercentileIndex == index) {
-				LOG.info("\t 90% of latencies are below: " + (latency / 1000000) + " ms");
+				sb.append("\t 90% of latencies are below: " + (latency / 1000000) + " ms \n");
 			} else if (ninenytNinePercentile == index) {
-				LOG.info("\t 99% of latencies are below: " + (latency / 1000000) + " ms");
+				sb.append("\t 99% of latencies are below: " + (latency / 1000000) + " ms \n");
 			} else if (lastLatency == index) {
-				LOG.info("\t max latency: " + (latency / 1000000) + " ms");
+				sb.append("\t max latency: " + (latency / 1000000) + " ms \n");
 			}
 			avrgLatency += ((float) latency / 1000000f);
 			index++;
 		}
-		LOG.info("Avrg latency is: " + avrgLatency / ((float) latencies.size()));
+		sb.append("Avrg latency is: " + avrgLatency / ((float) latencies.size()));
+		LOG.info(sb.toString());
 	}
 
 	private static void printResults(TobcastApp[] clients, int clientCount) {
@@ -237,14 +205,16 @@ public class TobcastApp extends Thread {
 
 		avrgLatency /= (float) clientCount;
 
-		LOG.info("**** Results with " + clientCount + " client(s) ****");
-		LOG.info("\t avrg. latency: " + avrgLatency + " ms");
-		LOG.info("\t avrg. throughput: " + avrgThroughput + " msgs/s");
+		StringBuffer sb = new StringBuffer();
+		sb.append("**** Results with " + clientCount + " client(s) **** \n");
+		sb.append("\t avrg. latency: " + avrgLatency + " ms \n");
+		sb.append("\t avrg. throughput: " + avrgThroughput + " msgs/s \n");
+		LOG.info(sb.toString());
 
 		printLatPercentiles(allLatencies);
 	}
 
-	private static void runExp(TobcastApp[] clients, int clientCount, boolean warmup) throws Exception {
+	private static void runExp(TobcastApp[] clients, int clientCount) throws Exception {
 		for (int i = 0; i < clientCount; i++) {
 			clients[i].start();
 		}
@@ -253,8 +223,10 @@ public class TobcastApp extends Thread {
 			clients[i].join();
 		}
 
-		if (!warmup) {
-			printResults(clients, clientCount);
+		printResults(clients, clientCount);
+
+		for (int i = 0; i < clients.length; i++) {
+			clients[i].endExperiment();
 		}
 	}
 
@@ -266,33 +238,24 @@ public class TobcastApp extends Thread {
 				int bcastCount = Integer.parseInt(args[2]);
 				PROTOCOL_TYPE protocol = PROTOCOL_TYPE.valueOf(args[3]);
 
-				TobcastApp[] clients = null;
+				TobcastApp[] clients = new TobcastApp[clientCount];
 
-				// Warm up
-				clients = new TobcastApp[1];
-				clients[0] = new TobcastApp(configFile, 1, BCAST_WARM_COUNT, protocol, true /* changeProtocol */, true /*warmup */);
-				runExp(clients, 1, true /* warmup */);
-
-				TobcastApp tmp = new TobcastApp(clients[0].clientId, bcastCount, clients[0].tobcast, clients[0].databases);
-				clients = new TobcastApp[clientCount];
-				clients[0] = tmp;
-
-				for (int i = 1; i < clientCount; i++) {
-					clients[i] = new TobcastApp(configFile, i + 1, bcastCount, protocol,
-					false /* changeProtocol */, false /* warmup */);
+				for (int i = 0; i < clientCount; i++) {
+					if (i == 0) {
+						clients[i] = new TobcastApp(configFile, i + 1, bcastCount, protocol, true /* changeProtocol */);
+					} else {
+						clients[i] = new TobcastApp(configFile, i + 1, bcastCount, protocol, false /* changeProtocol */);
+					}
 				}
 
-				runExp(clients, clientCount, false /* warmup */);
-				
-				for (int i = 0; i < clients.length; i++) {
-					clients[i].endExperiment();
-				}
+				runExp(clients, clientCount);
+
 			} else {
 				System.err.println("Please specify the configuration file, the number of clients, the number of "
 					+ " messages to broadcast, and the protocol to use (PAXOS, TWOTHIRD)");
 			}
 		} catch (Exception e) {
-			LOG.warning("Unable to start BankingApp, caught exception: " + e);
+			LOG.warning("Unable to start TobcastApp, caught exception: " + e);
 		}
 	}
 }

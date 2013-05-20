@@ -120,14 +120,4 @@ public class TransferTransaction extends ShadowTransaction {
 		sb.append(" to account: " + destAccount);
 		return sb.toString();
 	}
-
-	@Override
-	public QueryResult executeQuery(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public boolean executeUpdate(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
-	}
 }

@@ -55,6 +55,7 @@ import edu.Cornell.Diversity.ResilientTCP.FailFastSocket;
 import edu.Cornell.Diversity.ResilientTCP.SuspectedCrashException;
 import edu.Cornell.Diversity.TOBroadcast.AnerisMessage;
 import edu.Cornell.Diversity.TOBroadcast.TobcastClient;
+import edu.Cornell.Diversity.Utils.DbUtils;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 import edu.Cornell.Diversity.Utils.ShutdownHook;
 
@@ -64,7 +65,7 @@ import edu.Cornell.Diversity.Utils.ShutdownHook;
  * for the primary to broadcast a message to the backups, and for backups to
  * send message to the primary.
  * 
- * This class also maintains the composition of the group, replacing
+ * This class maintains the composition of the group, replacing
  * crashed replicas with fresh ones.
  * To ensure that group members observe the same sequence of group
  * incarnations, adding and removing members is done using Aneris, the total
@@ -77,7 +78,7 @@ public class Group extends Thread {
 	private static final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.ShadowDB.Group");
 
 	/**
-	 * The maximum number of simultaneous failures tolerated.
+	 * The maximum number of simultaneous tolerated failures.
 	 */
 	private int f;
 
@@ -97,12 +98,7 @@ public class Group extends Thread {
 	 */
 	private LinkedList<IdIpPort> members;
 
-	/**
-	 * The streams to communicate with the primary stored by primary id.
-	 * We may have streams open to more than one primary
-	 * when installing a new group membership.
-	 */
-	private final HashMap<String, FailFastSocket> socketsPrimary;
+	private FailFastSocket socketPrimary;
 
 	/**
 	 * Sockets to communicate with each one of the group backups.
@@ -152,7 +148,7 @@ public class Group extends Thread {
 	 * clients and is found in the configuration file).
 	 */
 	public Group(LinkedList<IdIpPort> dbServers, LinkedList<IdIpPort> tobcastServers,
-		ShadowDBServer dbServer, int serverPort, int clientPort) throws IOException {
+		ShadowDBServer dbServer, int serverPort, int clientPort) throws Exception {
 
 		this.registeredDb = dbServer;
 		this.allDbs = dbServers;
@@ -166,7 +162,6 @@ public class Group extends Thread {
 		}
 		this.nextDbToUse = f + 1;
 
-		this.socketsPrimary = new HashMap<String, FailFastSocket>();
 		this.socketMembers = new HashMap<String, FailFastSocket>();
 
 		// The primary is the first group member
@@ -175,11 +170,11 @@ public class Group extends Thread {
 		this.incarnation = 1;
 
 		if (registeredDb.isReplicated()) {
-			this.tobcastClient = TobcastClient.newInstance(tobcastServers, clientPort);
+			int clientId = DbUtils.extractIntFromId(dbServer.getDbId());
+			this.tobcastClient = TobcastClient.newInstance(tobcastServers, clientPort, clientId);
 		}
 
 	    this.serverSocket = openServerSocket(serverPort);
-	    ShutdownHook.addSocketToClose(serverSocket.socket());
 	    this.databaseKeys = new HashSet<SelectionKey>();
 
 		LOG.info(groupIdToString() + ", group initialized with members: " + members);
@@ -187,8 +182,7 @@ public class Group extends Thread {
 
 	/**
 	 * This method attempts to connect to the backup servers.
-	 * When successful, the fail-fast sockets connected to the backups
-	 * are returned. Otherwise, a SuspectedCrashException is thrown.
+	 * If unsuccessful, a SuspectedCrashException is thrown.
 	 */
 	private void connectToBckups() throws SuspectedCrashException {
 		assert(isPrimary());
@@ -197,11 +191,11 @@ public class Group extends Thread {
 			IdIpPort member = members.get(i);
 
 			if (!socketMembers.containsKey(member.getId())) {
-				LOG.info(registeredDb.dbIdToString() + " connecting to " + member.getId());
-				FailFastSocket ffSocket = FailFastSocket.newInstanceWithRetries(member.getIp(), member.getPort(),
-					member.getId(), registeredDb.getDbId(), 5);
+				LOG.info(registeredDb.dbIdToString() + " connecting to " + member);
+				FailFastSocket ffSocket = FailFastSocket.newInstance(member.getIp(), member.getPort(),
+					registeredDb.getDbId(), member.getId());
 				socketMembers.put(member.getId(), ffSocket);
-				LOG.info(registeredDb.dbIdToString() + " connected to backup: " + member.getId());
+				LOG.info(registeredDb.dbIdToString() + " connected to backup: " + member);
 			}
 		}
 	}
@@ -234,47 +228,28 @@ public class Group extends Thread {
 		return primary.getId();
 	}
 
-	/**
-	 * Returns the input and output streams of the current primary.
-	 */
-	private FailFastSocket getSocketPrimary() {
-		return socketsPrimary.get(primary.getId());
-	}
-
-	private void addSocketPrimary(FailFastSocket primarySocket) {
-		socketsPrimary.put(primarySocket.getEndPointId(), primarySocket);
-	}
-
 	public void sendToPrimary(TransactionId id) throws SuspectedCrashException {
 
-		FailFastSocket primary = getSocketPrimary();
-		if (primary != null) {
-			primary.writeObject(id);
+		if (socketPrimary != null) {
+			socketPrimary.writeObject(id);
 		} else {
-			LOG.severe("The group does not currently contain a primary!");
+			LOG.severe("Error trying to send a message to the primary, the socket is null");
 		}
 	}
 
 	public Object receiveFromPrimary() throws SuspectedCrashException, InterruptedException {
-		FailFastSocket primarySocket = socketsPrimary.get(primary.getId());
-		return primarySocket.readObject();
+		if (socketPrimary != null) {
+			return socketPrimary.readObject();
+		} else {
+			throw new IllegalStateException("Impossible to receive a message from the primary, the socket is null");
+		}
 	}
 
 	public void sendToBackups(ShadowTransaction t) throws SuspectedCrashException {
 	
-		LinkedList<FailFastSocket> bckups = getSocketBackups();
-		for (FailFastSocket socket : bckups) {
+		for (FailFastSocket socket : socketMembers.values()) {
 			socket.writeObject(t);
 		}
-	}
-
-	private LinkedList<FailFastSocket> getSocketBackups() {
-		LinkedList<FailFastSocket> streams = new LinkedList<FailFastSocket>();
-		for (String idIpPort : socketMembers.keySet()) {
-			streams.add(socketMembers.get(idIpPort));
-		}
-
-		return streams;
 	}
 
 	private TobcastClient getTobcastClient() {
@@ -307,43 +282,23 @@ public class Group extends Thread {
 
 	/**
 	 * Remove a member from the group identified by the id parameter
-	 * by broadcasting a new group configuration. The last sequence
+	 * by broadcasting a new group configuration message. The last sequence
 	 * number to be considered for the current configuration is denoted
 	 * by the seqNo parameter.
-	 * 
-	 * Not that only the first non-crashed member of the group will broadcast
-	 * a group reconfiguration. For the other members, this is a no-op.
 	 */
 	private void removeMember(String id, long seqNo) {
-		/**
-		 * As an optimization, only the first active (non-crashed) member of the group
-		 * broadcasts a group reconfiguration.
-		 */
-		String idFirstBckup = members.get(1).getId();
-		if (isPrimary() ||
-			(primary.getId().equals(id) && idFirstBckup.equals(registeredDb.getDbId()))) {
+		LinkedList<IdIpPort> newMembers = replaceCrashedMember(id);
+		AnerisMessage newConfig = new AnerisMessage(newMembers, seqNo, registeredDb.getDbId());
+		tobcastClient.toBcast(newConfig);
 
-			LinkedList<IdIpPort> newMembers = replaceCrashedMember(id);
-			AnerisMessage newConfig = new AnerisMessage(newMembers, seqNo, registeredDb.getDbId());
-			tobcastClient.toBcast(newConfig);
-
-			LOG.info("\n" + groupIdToString() + ", broadcast new group configuration: " + newConfig + "\n");
-		}
-
-		/**
-		 * TODO: If we are not the first active member, start a timer
-		 * to make sure that a group reconfiguration happens in case
-		 * the first active member crashes as well.
-		 */
+		LOG.info("\n" + groupIdToString() + ", broadcast new group configuration: " + newConfig + "\n");
 	}
 
 	/**
-	 * This method reconfigures the group by cleaning up connections
-	 * that are not needed anymore and making sure this database is
-	 * properly connected to the primary, if it's a backup db,
-	 * or connected to all backups, if it's the primary.
+	 * This method reconfigures the group by changing the group membership, the primary,
+	 * and closing connections to the previous group members.
 	 */
-	private void reconfigure(AnerisMessage newConfig) {
+	private void reconfigureGroup(AnerisMessage newConfig, Selector selector) {
 		assert(newConfig.getType() == AnerisMessage.ANERIS_MSG_TYPE.BCAST);
 
 		LOG.info("\n" + groupIdToString() + ", received new group configuration: " + newConfig);
@@ -361,46 +316,38 @@ public class Group extends Thread {
 		nextDbToUse = (indexLastMember + 1) % allDbs.size();
 
 		/**
-		 * Cleanup connections that are not needed anymore.
+		 * Cancel socket registrations and close connections to the previous
+		 * group members.
 		 */
+		deregisterKeys(databaseKeys);
+
 		try {
-			// Old primaries
-			for (String id : socketsPrimary.keySet()) {
-				// Make sure we do not disconnect clients
-				if (!id.equals(primary.getId()) && id.startsWith("database")) {
-					socketsPrimary.get(id).close();
-					socketsPrimary.remove(id);
-				}
+			// Old primary
+			if (socketPrimary != null) {
+				socketPrimary.close();
+				socketPrimary = null;
 			}
 			// Old backups
-			for (String id : socketMembers.keySet()) {
-				boolean found = false;
-				for (IdIpPort idIpPort : members) {
-					// Make sure we do not disconnect clients
-					if (idIpPort.getId().equals(id) && id.startsWith("database")) {
-						found = true;
-						break;
-					}
-				}
-				if (!found) {
-					socketMembers.get(id).close();
-					socketMembers.remove(id);
-				}
+			for (FailFastSocket backupSocket : socketMembers.values()) {
+				backupSocket.close();
 			}
+			socketMembers.clear();
 		} catch (Exception e) {
 			LOG.warning(groupIdToString() + " unable to close connections of previous group members: " + e);
 		}
 
-		// If we are the primary, make sure we are connected to all backups
 		if (isPrimary()) {
 			try {
 				/**
-				 * Wait a little bit to make sure all backups are started
-				 * and they delivered the new configuration.
+				 * Wait a little bit to make sure all backups delivered the
+				 * new configuration.
 				 */
 				Thread.sleep(ShadowDBConfig.getGroupReconfigurationTime());
 
 				connectToBckups();
+				for (FailFastSocket backup : socketMembers.values()) {
+					registerSocketAndAddKey(selector, backup, databaseKeys);
+				}
 			} catch (Exception e) {
 				if (e instanceof SuspectedCrashException) {
 					SuspectedCrashException sce = (SuspectedCrashException) e;
@@ -419,16 +366,22 @@ public class Group extends Thread {
 
 	private void registerSockets(Selector selector) throws Exception {
 
-		databaseKeys.clear();
 		if (isPrimary()) {
-			for (FailFastSocket socket : getSocketBackups()) {
+			for (FailFastSocket socket : socketMembers.values()) {
 				registerSocketAndAddKey(selector, socket, databaseKeys);
 			}
+		} else {
+			if (socketPrimary != null) {
+				registerSocketAndAddKey(selector, socketPrimary, databaseKeys);
+			}
 		}
-		if (registeredDb.isReplicated()) {
+		if (registeredDb.isReplicated() && tobcastClientKeys == null) {
 			tobcastClientKeys = registerAndAttachSocket(selector, getTobcastClient().getSockets());
 		}
-		serverSocketKey = serverSocket.register(selector, SelectionKey.OP_ACCEPT);
+
+		if (serverSocketKey == null || !serverSocketKey.channel().equals(serverSocket)) {
+			serverSocketKey = serverSocket.register(selector, SelectionKey.OP_ACCEPT);
+		}
 	}
 
 	private void registerSocketAndAddKey(Selector selector, FailFastSocket socket,
@@ -473,6 +426,21 @@ public class Group extends Thread {
 		return false;
 	}
 
+	private void changeSocket2Primary(FailFastSocket newPrimary) throws IOException {
+		if (socketPrimary != null) {
+			socketPrimary.close();
+		}
+		socketPrimary = newPrimary;
+	}
+
+	private void deregisterKeys(HashSet<SelectionKey> keys) {
+
+		for (SelectionKey key : keys) {
+			key.cancel();
+		}
+		databaseKeys.clear();		
+	}
+
 	/**
 	 * This method is called after the group has been initialized to receive messages from
 	 * the network and issue the corresponding callbacks.
@@ -481,7 +449,7 @@ public class Group extends Thread {
 		Selector selector;
 
 		/**
-		 * Registering the channels to do asynchronous I/O and
+		 * Register the channels for asynchronous I/O and
 		 * make the primary connect to the backups.
 		 */
 		try {
@@ -491,11 +459,19 @@ public class Group extends Thread {
 			}
 			registerSockets(selector);
 		} catch (Exception e) {
-			LOG.severe(registeredDb.dbIdToString() + " unable to init asynchronous io, caught exception: " + e);
+			LOG.severe(registeredDb.dbIdToString() + " unable to start replica group, caught exception: " + e);
 			return;
 		}
 
 		long now;
+
+		/**
+		 * A timeout used by backups to detect initial primary failures
+		 * (The primary crashes before connecting to the backups. A timeout
+		 * of 0 means no timeout.
+		 */
+		long timeout = 0l;
+
 		boolean reconfiguringGroup = false;
 
 		/**
@@ -503,7 +479,7 @@ public class Group extends Thread {
 		 */
 		for (;;) {
 			/**
-			 * Code executed by the primary database.
+			 * Code executed by the primary.
 			 */
 			if (isPrimary()) {
 				try {
@@ -517,14 +493,15 @@ public class Group extends Thread {
 						while (it.hasNext()) {
 							SelectionKey key = it.next();
 							it.remove();
-	 
+
 							/**
 							 * Incoming client connections.
 							 */
 							if (serverSocketKey.equals(key)) {
 								SocketChannel socket = serverSocket.accept();
 								FailFastSocket clientSocket =
-									FailFastSocket.newInstance(socket, socket.socket().getRemoteSocketAddress().toString());
+									FailFastSocket.newInstance(socket, registeredDb.getDbId(),
+										null);
 								registeredDb.onNewConnection(clientSocket, selector, isPrimary());
 							}
 							/**
@@ -542,24 +519,27 @@ public class Group extends Thread {
 
 								for (AnerisMessage delivered : msgs) {
 									if (delivered.getType() == AnerisMessage.ANERIS_MSG_TYPE.BCAST) {
-										reconfigure(delivered);
-										selector.close();
-										selector = Selector.open();
-										registerSockets(selector);
-										
-										registeredDb.onGroupReconfiguration(delivered.getSeqNo());
-										reconfiguringGroup = false;
+										/**
+										 * Ignore reconfiguration messages that contain
+										 * the current group membership.
+										 */
+										if (!delivered.getMembers().equals(members)) {
+											reconfigureGroup(delivered, selector);										
+											registeredDb.onGroupReconfiguration(delivered.getSeqNo());
+											reconfiguringGroup = false;
+										}
 									} else {
 										LOG.info("Consensus protocol changed to: " + delivered.getProtocol());
 									}
 								}
 							}
 						}
+					}
 					/**
 					 * Executing client transactions.
 					 * This only done if we are not reconfiguring the group.
 					 */
-					} else if (!reconfiguringGroup) {
+					if (!reconfiguringGroup) {
 						registeredDb.executeTransactionsAtPrimary(now);
 					}
 
@@ -579,12 +559,24 @@ public class Group extends Thread {
 				}
 			}
 			/**
-			 *  Code executed by backup databases.
+			 *  Code executed by backups.
 			 */
 			else {
 				try {
-					int nbChannelsReady = selector.select();
+					int nbChannelsReady = selector.select(timeout);
 					now = System.currentTimeMillis();
+
+					/**
+					 * If we are waiting for a connection from the primary
+					 * and the primary has not connected to
+					 * us yet, we remove the primary from the group.
+					 */
+					if (socketPrimary == null && timeout != 0l &&
+						nbChannelsReady == 0) {
+						removeMember(primary.getId(), registeredDb.getSeqNo());
+						reconfiguringGroup = true;
+					}
+					timeout = 0l;
 
 					if (nbChannelsReady > 0) {
 						Iterator<SelectionKey> it = selector.selectedKeys().iterator();
@@ -598,17 +590,20 @@ public class Group extends Thread {
 							 */
 							if (serverSocketKey.equals(key)) {
 								SocketChannel socket = serverSocket.accept();
-								FailFastSocket clientSocket = FailFastSocket.newInstance(socket, primary.getId());
+								FailFastSocket primarySocket = FailFastSocket.newInstance(socket, registeredDb.getDbId(),
+									primary.getId());
 
-								// Only accept connections from the primary
-								if (clientSocket.getEndPointId().equals(getPrimaryId())) {
-									databaseKeys.clear();
-									registerSocketAndAddKey(selector, clientSocket, databaseKeys);
-									addSocketPrimary(clientSocket);
+								/**
+								 * Only accept connections from the current primary.
+								 */
+								if (primarySocket.getEndPointId().equals(getPrimaryId())) {
+									registerSocketAndAddKey(selector, primarySocket, databaseKeys);
+									changeSocket2Primary(primarySocket);
+
 								} else {
 									LOG.warning(registeredDb.dbIdToString() + " rejected connection from: "
-										+ clientSocket.getEndPointId());
-									clientSocket.close();
+										+ primarySocket.getEndPointId());
+									primarySocket.close();
 								}
 							/**
 							 * Handling transactions coming from the primary.
@@ -625,13 +620,24 @@ public class Group extends Thread {
 								if (msgs != null) {
 									for (AnerisMessage delivered : msgs) {
 										if (delivered.getType() == AnerisMessage.ANERIS_MSG_TYPE.BCAST) {
-											reconfigure(delivered);
-											selector.close();
-											selector = Selector.open();
-											registerSockets(selector);
-		
-											registeredDb.onGroupReconfiguration(delivered.getSeqNo());
-											reconfiguringGroup = false;
+											/**
+											 * Ignore reconfiguration messages that contain
+											 * the current group membership.
+											 */
+											if (!delivered.getMembers().equals(members)) {
+												reconfigureGroup(delivered, selector);		
+												registeredDb.onGroupReconfiguration(delivered.getSeqNo());
+												reconfiguringGroup = false;
+
+												/**
+												 * The primary connects to the backups ShadowDBConfig.getGroupReconfigurationTime()
+												 * after installing the new group configuration. We therefore set the timeout
+												 * to two times this value if we are not the new primary.
+												 */
+												if (!primary.getId().equals(registeredDb.getDbId())) {
+													timeout = 2 * ShadowDBConfig.getGroupReconfigurationTime();
+												}
+											}
 										} else {
 											LOG.info("Consensus protocol changed to: " + delivered.getProtocol());
 										}
@@ -646,8 +652,6 @@ public class Group extends Thread {
 					 */
 					registeredDb.gcTransactions(now);
 				} catch (Exception e) {
-					e.printStackTrace();
-
 					if (e instanceof SuspectedCrashException) {
 						SuspectedCrashException sce = (SuspectedCrashException) e;
 						LOG.info("\n Detected crash of: " + sce.getId() + "\n");

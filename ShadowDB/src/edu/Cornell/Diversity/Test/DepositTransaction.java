@@ -36,7 +36,7 @@ public class DepositTransaction extends ShadowTransaction {
 		this.accounts = new int[accounts.length];
 
 		for (int i = 0; i < accounts.length; i++) {
-			accounts[i] = accounts[i];
+			this.accounts[i] = accounts[i];
 		}
 
 		this.amount = amount;
@@ -77,15 +77,5 @@ public class DepositTransaction extends ShadowTransaction {
 		sb.append("Deposit: " + amount);
 		sb.append("$ on accounts: " + accounts);
 		return sb.toString();
-	}
-
-	@Override
-	public QueryResult executeQuery(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public boolean executeUpdate(Connection connection) throws SQLException {
-		throw new UnsupportedOperationException();
 	}
 }

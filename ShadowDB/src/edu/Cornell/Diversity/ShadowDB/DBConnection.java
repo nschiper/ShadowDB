@@ -47,7 +47,7 @@ import java.sql.Connection;
  */
 public interface DBConnection {
 
-	public QueryResult submit(ShadowTransaction transaction) throws Exception;
+	public QueryResult submit(ShadowTransaction transaction);
 
 	public Connection getConnection();
 
