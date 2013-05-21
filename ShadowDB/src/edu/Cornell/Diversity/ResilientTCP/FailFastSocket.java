@@ -52,8 +52,6 @@ import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
-import com.sun.istack.internal.Nullable;
-
 import edu.Cornell.Diversity.ShadowDB.ShadowDBConfig;
 import edu.Cornell.Diversity.Utils.NIOUtils;
 
@@ -177,7 +175,7 @@ public class FailFastSocket extends Thread {
 		this.socketChannel.configureBlocking(false);
 	}
 
-	public static FailFastSocket newInstance(SocketChannel channel, String localId, @Nullable String remoteId)
+	public static FailFastSocket newInstance(SocketChannel channel, String localId, String remoteId)
 		throws SuspectedCrashException {
 
 		if (remoteId == null) {
