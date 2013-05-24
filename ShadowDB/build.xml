@@ -33,7 +33,7 @@
             <src path="src"/>
             <classpath refid="ShadowDB.classpath"/>
         </javac>
-        <jar destfile="../ShadowDB.jar" basedir="bin/" />
+        <jar destfile="../jars/ShadowDB.jar" basedir="bin/" />
     </target>
     <target description="Build all projects which reference this project. Useful to propagate changes." name="build-refprojects"/>
 </project>

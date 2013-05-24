@@ -1,0 +1,57 @@
+%locations acceptors
+ acc1 : 192.168.1.11 8889
+ acc2 : 192.168.1.12 8890
+ acc3 : 192.168.1.13 8891
+
+%locations leaders
+ ldr1 : 192.168.1.11 8892
+ ldr2 : 192.168.1.12 8893
+
+%locations two_thirds
+ loc1 : 192.168.1.11 8894
+ loc2 : 192.168.1.12 8895
+ loc3 : 192.168.1.13 8896
+ loc4 : 192.168.1.14 8867
+
+%locations replicas
+ rep1 : 192.168.1.11 8870
+ rep2 : 192.168.1.12 8871
+
+%locations external clients
+ client1 : 192.168.1.13 8875
+ client2 : 192.168.1.14 8876
+ client3 : 192.168.1.15 8877
+ client4 : 192.168.1.16 8878
+
+%connections
+  acceptors  -> leaders
+  leaders    -> replicas
+  two_thirds -> replicas
+  clients    -> replicas
+
+%parameters
+ reps     : {LOC(rep1);LOC(rep2)}
+ ldrs     : {LOC(ldr1);LOC(ldr2)}
+ accpts   : {LOC(acc1);LOC(acc2);LOC(acc3)}
+ locs     : {LOC(loc1);LOC(loc2);LOC(loc3);LOC(loc4)}
+ clients  : {LOC(client1);LOC(client2);LOC(client3);LOC(client4)}
+ Cid      : TYPE(Int)
+ Op       : TYPE(Tok List)
+ eq_Cid   : DEQ(Int)
+ eq_Op    : DEQ(Tok List)
+ ldrs_uid : \loc.if loc = LOC(ldr1) then 1 else 2
+ flrs     : 1
+ f : \hdr.1
+
+%messages
+ rep1 : (``request``, (Loc * (Int * Tok List)), (LOC(client), (12,``foobar``)))
+ rep1 : (``swap``, (Int * Tok List), (13,``paxos``))
+ rep1 : (``request``, (Loc * (Int * Tok List)), (LOC(client), (14,``barfoo``)))
+ rep1 : (``request``, (Loc * (Int * Tok List)), (LOC(client), (15,``barfoo``)))
+ rep1 : (``request``, (Loc * (Int * Tok List)), (LOC(client), (16,``barfoo``)))
+ rep1 : (``request``, (Loc * (Int * Tok List)), (LOC(client), (17,``barfoo``)))
+
+%databases
+ database1 : 192.168.1.11 14522 h2
+ database2 : 192.168.1.12 14522 h2
+ database3 : 192.168.1.13 14522 h2
