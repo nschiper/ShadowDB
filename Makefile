@@ -45,11 +45,14 @@ clean:
 testdb:
 	(cd scripts; ./startDbServer.sh 1 stdalone)
 
-testrep:
+testrep1:
 	(cd scripts; ./startDbServer.sh 1 replicated)
 
+testrep2:
+	(cd scripts; ./startDbServer.sh 2 replicated)
+
 testbank:
-	(cd scripts; ./startBankingClient.sh read-only 2 1 10 2)
+	(cd scripts; ./startBankingClient.sh read-only 50000 5 5 1)
 
 start1:
 	(cd scripts; ./startAneris1.sh local)
