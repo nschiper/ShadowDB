@@ -3,9 +3,7 @@
 # $3 "replicated" or "standalone"
 # $4 "INTERPRETED" or "LISP" whether it is the interpreted or Lisp version of Aneris that is running
 
-#MIN_SIZE=1024
 MIN_SIZE=512
-#MAX_SIZE=3072
 MAX_SIZE=1024
 JARS=../jars/h2-1.3.170.jar:../jars/hsqldb.jar:../jars/derby.jar:../jars/ShadowDB.jar
 LOG_PROP=../conf/logging.properties
