@@ -38,7 +38,7 @@ This section explains how to test ShadowDB and Aneris locally.  We
 will use the conf/conf_aneris_local.emlc configuration file instead of
 the conf/conf_aneris.emlc file.
 
-1) First we start various Aneris processes.  They are suppose to run
+1) First we start various Aneris processes.  They are supposed to run
 on 4 machines, so we have 4 scripts to start these processes.  Go to
 the scripts directory and type:
 
@@ -63,3 +63,9 @@ from the root directory.
 
   make testrep1
   make testrep2
+
+3) To test the database, you can run the startBankingClient script as
+follows:
+
+  make testbank
+
