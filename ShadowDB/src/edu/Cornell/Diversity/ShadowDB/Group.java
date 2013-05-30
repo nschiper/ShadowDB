@@ -55,6 +55,7 @@ import edu.Cornell.Diversity.ResilientTCP.FailFastSocket;
 import edu.Cornell.Diversity.ResilientTCP.SuspectedCrashException;
 import edu.Cornell.Diversity.TOBroadcast.AnerisMessage;
 import edu.Cornell.Diversity.TOBroadcast.TobcastClient;
+import edu.Cornell.Diversity.TOBroadcast.TobcastClient.AnerisType;
 import edu.Cornell.Diversity.Utils.DbUtils;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 import edu.Cornell.Diversity.Utils.ShutdownHook;
@@ -148,7 +149,7 @@ public class Group extends Thread {
 	 * clients and is found in the configuration file).
 	 */
 	public Group(LinkedList<IdIpPort> dbServers, LinkedList<IdIpPort> tobcastServers,
-		ShadowDBServer dbServer, int serverPort, int clientPort) throws Exception {
+		ShadowDBServer dbServer, int serverPort, AnerisType anerisType, int clientPort) throws Exception {
 
 		this.registeredDb = dbServer;
 		this.allDbs = dbServers;
@@ -171,7 +172,7 @@ public class Group extends Thread {
 
 		if (registeredDb.isReplicated()) {
 			int clientId = DbUtils.extractIntFromId(dbServer.getDbId());
-			this.tobcastClient = TobcastClient.newInstance(tobcastServers, clientPort, clientId);
+			this.tobcastClient = TobcastClient.newInstance(tobcastServers, clientPort, clientId, anerisType);
 		}
 
 	    this.serverSocket = openServerSocket(serverPort);

@@ -52,12 +52,13 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Logger;
 
 import edu.Cornell.Diversity.ResilientTCP.FailFastSocket;
+import edu.Cornell.Diversity.TOBroadcast.TobcastClient.AnerisType;
 import edu.Cornell.Diversity.Utils.ConfigurationParser;
 import edu.Cornell.Diversity.Utils.DbUtils;
+import edu.Cornell.Diversity.Utils.DbUtils.DB_TYPE;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 import edu.Cornell.Diversity.Utils.ShutdownHook;
 import edu.Cornell.Diversity.Utils.TransactionIdGenerator;
-import edu.Cornell.Diversity.Utils.DbUtils.DB_TYPE;
 
 /**
  * This class implements the ShadowDB replication protocol,
@@ -165,7 +166,7 @@ public class ShadowDBServer {
 
 	private ShadowDBServer(String dbId, int dbPort, boolean replicated, DB_TYPE dbType,
 		int nextSeqNo, LinkedList<IdIpPort> allDbs, LinkedList<IdIpPort> tobcastServers,
-		int clientPort) throws Exception {
+		AnerisType anerisType, int clientPort) throws Exception {
 
 	    this.dbType = dbType;
 	    this.dbId = dbId;
@@ -179,7 +180,7 @@ public class ShadowDBServer {
 
 	    this.gcTimeoutMillis = ShadowDBConfig.getGcTimeoutMillis();
 	    this.toGC = new LinkedHashMap<Long, TransactionId>();
-		this.group = new Group(allDbs, tobcastServers, this, dbPort, clientPort);
+		this.group = new Group(allDbs, tobcastServers, this, dbPort, anerisType, clientPort);
 
 		LOG.info(dbIdToString() + " started replica");
 	}
@@ -484,12 +485,13 @@ public class ShadowDBServer {
 	/*********************** End of callbacks ************************/
 
 	public static void main(String[] args) {
-		if (args.length == 3) {
+		if (args.length == 4) {
 			ShadowDBServer dbServer = null;
 
 			String dbId = args[0];
 			String configFile = args[1];
 			boolean replicated = args[2].equals("replicated");
+			AnerisType anerisType = AnerisType.valueOf(args[3]);
 
 			LinkedList<IdIpPort> allDbs = null;
 			LinkedList<IdIpPort> tobcastServers = null;
@@ -509,7 +511,7 @@ public class ShadowDBServer {
 				int nextSeqNo = 1;
 
 				dbServer = new ShadowDBServer(dbId, dbPort, replicated, dbType,
-					nextSeqNo, allDbs, tobcastServers, clientPort);
+					nextSeqNo, allDbs, tobcastServers, anerisType, clientPort);
 				ShutdownHook.addDbToClose(dbServer);
 				ShutdownHook.installHook();
 
@@ -528,7 +530,8 @@ public class ShadowDBServer {
 			}
 		} else {
 			System.err.println("Please specify the db id, the configuration file, "
-				+ " and whether the db is replicated or stdalone (replicated/stdalone)");
+				+ " whether the db is replicated or stdalone (replicated/stdalone), "
+				+ " and Aneris's type (INTERPRETED/LISP)");
 		}
 	}
 

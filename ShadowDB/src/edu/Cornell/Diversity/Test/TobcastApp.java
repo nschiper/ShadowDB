@@ -45,6 +45,7 @@ import java.util.logging.Logger;
 import edu.Cornell.Diversity.TOBroadcast.AnerisMessage;
 import edu.Cornell.Diversity.TOBroadcast.AnerisMessage.PROTOCOL_TYPE;
 import edu.Cornell.Diversity.TOBroadcast.TobcastClient;
+import edu.Cornell.Diversity.TOBroadcast.TobcastClient.AnerisType;
 import edu.Cornell.Diversity.Utils.ConfigurationParser;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 
@@ -66,7 +67,8 @@ public class TobcastApp extends Thread {
 	private float throughput;
 	private final LinkedList<Long> latencies;
 
-	public TobcastApp(String configFile, int clientId, int bcastCount, PROTOCOL_TYPE protocol, boolean changeProtocol) {
+	public TobcastApp(String configFile, int clientId, int bcastCount, PROTOCOL_TYPE protocol,
+		AnerisType anerisType, boolean changeProtocol) {
 
 		this.clientId = clientId;
 		this.bcastCount = bcastCount;
@@ -79,7 +81,7 @@ public class TobcastApp extends Thread {
 			if (clientPort == null) {
 				clientPort = TobcastClient.EXTERNAL_CLIENT;
 			}
-			tobcast = TobcastClient.newInstance(tobcastServers, clientPort, clientId);
+			tobcast = TobcastClient.newInstance(tobcastServers, clientPort, clientId, anerisType);
 			configParser.closeConfigFile();
 
 			latencies = new LinkedList<Long>();
@@ -232,19 +234,22 @@ public class TobcastApp extends Thread {
 
 	public static void main(String[] args) {
 		try {
-			if (args.length == 4) {
+			if (args.length == 5) {
 				String configFile = args[0];
 				int clientCount = Integer.parseInt(args[1]);
 				int bcastCount = Integer.parseInt(args[2]);
-				PROTOCOL_TYPE protocol = PROTOCOL_TYPE.valueOf(args[3]);
+				AnerisType anerisType = AnerisType.valueOf(args[3]);
+				PROTOCOL_TYPE protocol = PROTOCOL_TYPE.valueOf(args[4]);
 
 				TobcastApp[] clients = new TobcastApp[clientCount];
 
 				for (int i = 0; i < clientCount; i++) {
 					if (i == 0) {
-						clients[i] = new TobcastApp(configFile, i + 1, bcastCount, protocol, true /* changeProtocol */);
+						clients[i] = new TobcastApp(configFile, i + 1, bcastCount, protocol, anerisType,
+							true /* changeProtocol */);
 					} else {
-						clients[i] = new TobcastApp(configFile, i + 1, bcastCount, protocol, false /* changeProtocol */);
+						clients[i] = new TobcastApp(configFile, i + 1, bcastCount, protocol, anerisType,
+							false /* changeProtocol */);
 					}
 				}
 
@@ -252,7 +257,8 @@ public class TobcastApp extends Thread {
 
 			} else {
 				System.err.println("Please specify the configuration file, the number of clients, the number of "
-					+ " messages to broadcast, and the protocol to use (PAXOS, TWOTHIRD)");
+					+ " messages to broadcast, Aneris's type (INTERPRETED/LISP), "
+					+ " and the protocol to use (PAXOS, TWOTHIRD)");
 			}
 		} catch (Exception e) {
 			LOG.warning("Unable to start TobcastApp, caught exception: " + e);

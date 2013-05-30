@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import edu.Cornell.Diversity.TOBroadcast.TobcastClient.AnerisType;
 import edu.Cornell.Diversity.Utils.DbUtils;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 
@@ -57,6 +58,7 @@ import edu.Cornell.Diversity.Utils.IdIpPort;
  */
 public class AnerisMessage {
 
+	private static Pattern MSG_DELIMITER_PATTERN = Pattern.compile(TobcastClient.MSG_SEPARATOR);
 	private static Pattern CMD_PATTERN = Pattern.compile("\\#\\#\\#(.)+\\#\\#\\#");
 	private static Pattern ID_PATTERN = Pattern.compile("\\p{Alpha}+\\d+");
 	private static Pattern INTEGER_PATTERN = Pattern.compile("\\#(\\d+)\\#");
@@ -76,7 +78,7 @@ public class AnerisMessage {
 	private static String FAKE_ID = "FakeId0";
 
 	/**
-	 * The Nuprl term format to send messages to Aneris.
+	 * The Nuprl term format to send messages to Aneris when interpreted.
 	 */
 	public static final String ANERIS_SEND_MSG_FORMAT = new StringBuffer()
 		.append("{pair:OPID}")
@@ -88,6 +90,14 @@ public class AnerisMessage {
 		.append("{pair:OPID}")
 		.append("({token:OPID,%s:t}();") // command
 		.append("{axiom:OPID}())))").toString();
+
+	/**
+	 * The Nuprl term format to send messages to Aneris when running in Lisp.
+	 */
+	public static final String ANERIS_LISP_SEND_MSG_FORMAT = new StringBuffer()
+		.append("#S(PAIR :FST #S(PAIR :FST \"%s\"")  // bcast or swap
+		.append(" :SND #S(AXIOM)) :SND #S(PAIR :FST %d")  // command id
+		.append(" :SND #S(PAIR :FST \"%s\" :SND #S(AXIOM))))").toString();  // command
 
 	/**
 	 * The Aneris message format (a Nuprl term).
@@ -274,23 +284,35 @@ public class AnerisMessage {
 		return anerisMsg;
 	}
 
-	public static long parseSlot(String msg) {
+	public static long parseSlot(String msg, AnerisType anerisType) {
 		long index;
 
-		Matcher indexMatcher = NATURAL_NUMBER_PATTERN.matcher(msg);
-		while(indexMatcher.find()) {
-			Scanner scanner = new Scanner(indexMatcher.group()).useDelimiter("\\p{Punct}");
-			while (!scanner.hasNextLong()) {
-				scanner.next();
-			}
-			index = scanner.nextLong();
+		if (anerisType == AnerisType.INTERPRETED) {
+			Matcher indexMatcher = NATURAL_NUMBER_PATTERN.matcher(msg);
+			while(indexMatcher.find()) {
+				Scanner scanner = new Scanner(indexMatcher.group()).useDelimiter("\\p{Punct}");
+				while (!scanner.hasNextLong()) {
+					scanner.next();
+				}
+				index = scanner.nextLong();
 
-			// The slot is the first long bigger than zero.
-			if (index > 0) {
-				return index;
+				// The slot is the first long bigger than zero.
+				if (index > 0) {
+					return index;
+				}
+			}
+		} else if (anerisType == AnerisType.LISP) {
+			Scanner scanner = new Scanner(msg);
+			while (scanner.hasNext()) {
+				if (scanner.hasNextLong()) {
+					index = scanner.nextLong();
+					return index;
+				} else {
+					scanner.next();
+				}
 			}
 		}
-		throw new IllegalArgumentException("Incorrect syntax for aneris message: " + msg);
+		throw new IllegalArgumentException("Unsupported aneris type: " + anerisType);
 	}
 
 	/**
@@ -327,34 +349,82 @@ public class AnerisMessage {
 	}
 
 	/**
+	 * Parses a message when received from the Lisp version of Aneris. This message
+	 * may contain multiple commands.
+	 */
+	private static LinkedList<AnerisMessage> parseStringLisp(String msg, long slot) {
+		LinkedList<AnerisMessage> anerisMsgs = new LinkedList<AnerisMessage>();
+		AnerisMessage anerisMsg;
+		ANERIS_MSG_TYPE msgType;
+
+		if (msg.contains(ANERIS_MSG_TYPE.DUMMY.name()) ||
+			msg.contains(ANERIS_MSG_TYPE.BCAST.name())) {
+
+			msgType = ANERIS_MSG_TYPE.BCAST;
+
+		} else {
+			msgType = ANERIS_MSG_TYPE.SWAP;
+		}
+
+		// The string may contain multiple commands
+		Scanner scanner = new Scanner(msg);
+		scanner.useDelimiter(MSG_DELIMITER_PATTERN);
+
+		while (scanner.hasNext()) {
+			String cmd = scanner.next();
+			anerisMsg = parseOneCmd(cmd, msgType);
+			anerisMsg.setSlot(slot);
+			anerisMsgs.add(anerisMsg);
+		}
+
+		return anerisMsgs;
+	}
+
+	/**
 	 * Builds a list of Aneris messages from a string representation of the
 	 * objects.
 	 * 
 	 * @throws IllegalArgumentException if the message is in the wrong format.
 	 */
-	public static LinkedList<AnerisMessage> parseString(String msg, long slot) {
+	public static LinkedList<AnerisMessage> parseString(String msg, long slot, AnerisType anerisType) {
 
-		return parseStringInterpreted(msg, slot);
+		if (anerisType == AnerisType.INTERPRETED) {
+			return parseStringInterpreted(msg, slot);
+
+		} else if (anerisType == AnerisType.LISP) {
+			return parseStringLisp(msg, slot);
+
+		} else {
+			throw new IllegalArgumentException("Unsupported aneris message type: " + msg);
+		}
 	}
 
 	/**
 	 * Returns the Nuprl string representation (understandable by Aneris) of
 	 * the object.
 	 */
-	public String toNuprlString() {
-		return String.format(ANERIS_SEND_MSG_FORMAT, msgType.toString(), uid, nuprlProposal());
+	public String toNuprlString(AnerisType type) {
+		if (type == AnerisType.INTERPRETED) {
+			return String.format(ANERIS_SEND_MSG_FORMAT, msgType.toString(), uid, nuprlProposal());
+		} else {
+			return String.format(ANERIS_LISP_SEND_MSG_FORMAT, msgType.toString(), uid, nuprlProposal());
+		}
 	}
 
-	public static String toNuprlString(ANERIS_MSG_TYPE msgType, long commandId, String nuprlProposal) {
-		return String.format(ANERIS_SEND_MSG_FORMAT, msgType, commandId, nuprlProposal);
+	public static String toNuprlString(AnerisType type, ANERIS_MSG_TYPE msgType, long commandId, String nuprlProposal) {
+		if (type == AnerisType.INTERPRETED) {
+			return String.format(ANERIS_SEND_MSG_FORMAT, msgType, commandId, nuprlProposal);
+		} else {
+			return String.format(ANERIS_LISP_SEND_MSG_FORMAT, msgType, commandId, nuprlProposal);
+		}
 	}
 
 	/**
 	 * Returns a byte-encoded form of this object that is understandable
 	 * by the Aneris service and ready to be sent over the network.
 	 */
-	public byte[] getBytes() {
-		String nuprlString = toNuprlString();
+	public byte[] getBytes(AnerisType type) {
+		String nuprlString = toNuprlString(type);
 		byte[] msgInBytes = nuprlString.getBytes();
 		return (msgInBytes.length + "!" + nuprlString).getBytes();
 	}

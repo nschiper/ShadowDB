@@ -71,6 +71,8 @@ public class TobcastClient extends Thread {
 
 	private static final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.TOBroadcast.TobcastClient");
 
+	public enum AnerisType {INTERPRETED, LISP};
+
 	/**
 	 * The maximum number of bytes for a message residing
 	 * in a byte buffer. This can be increased if needed.
@@ -120,6 +122,7 @@ public class TobcastClient extends Thread {
 
 	private static AtomicBoolean TERMINATE;
 
+	private static AnerisType ANERIS_TYPE;
 	/**
 	 * This represents the index of the next message the client
 	 * should deliver.
@@ -143,7 +146,7 @@ public class TobcastClient extends Thread {
 	 * Creates a TobcastClient and specifies the first slot to deliver.
 	 */
 	public synchronized static TobcastClient newInstance(LinkedList<IdIpPort> servers, int clientPort,
-		int clientId, long startSlot) throws IOException {
+		AnerisType anerisType, int clientId, long startSlot) throws IOException {
 
 		TobcastClient client = new TobcastClient(clientId, startSlot);
 
@@ -165,16 +168,18 @@ public class TobcastClient extends Thread {
 			SELECTOR = Selector.open();
 			THREAD_STARTED = true;
 			TERMINATE = new AtomicBoolean(false);
+			ANERIS_TYPE = anerisType;
 
 			client.start();
 		}
 		return client;
 	}
 
-	public static TobcastClient newInstance(LinkedList<IdIpPort> servers, int clientPort, int clientId)
+	public static TobcastClient newInstance(LinkedList<IdIpPort> servers, int clientPort, int clientId,
+		AnerisType anerisType)
 		throws IOException {
 
-		return newInstance(servers, clientPort, clientId, 1l);
+		return newInstance(servers, clientPort, anerisType, clientId, 1l);
 	}
 
 	public void closeSockets() {
@@ -281,10 +286,11 @@ public class TobcastClient extends Thread {
 							 * Since it is enough to receive each command from only one replica, we first parse
 							 * the slot number to avoid parsing the message multiple times.
 							 */
-							long slot = AnerisMessage.parseSlot(rcvdMsg);
+							long slot = AnerisMessage.parseSlot(rcvdMsg, ANERIS_TYPE);
 
 							if (slot >= slotNextMsg) {
-								LinkedList<AnerisMessage> anerisMsg = AnerisMessage.parseString(rcvdMsg, slot);
+								LinkedList<AnerisMessage> anerisMsg = AnerisMessage.parseString(rcvdMsg, slot,
+									ANERIS_TYPE);
 
 								if (DELIVERED_MSG_BUFF.putIfAbsent(slot, anerisMsg) == null) {
 
@@ -344,7 +350,7 @@ public class TobcastClient extends Thread {
 					}
 
 					long commandId = clientId * 100000000l + seqNo++;
-					String nuprlProposal = AnerisMessage.toNuprlString(msgType, commandId, sb.toString());
+					String nuprlProposal = AnerisMessage.toNuprlString(ANERIS_TYPE, msgType, commandId, sb.toString());
 					sendMsgToAneris(nuprlProposal, byteBuffer);
 					sb.delete(0,  sb.length());
 
