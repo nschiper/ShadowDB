@@ -1,11 +1,20 @@
 INSTALLATION
 ------------
 
-1) Compile ShadowDB using Apache Ant by simply typing 'ant' in the ShadowDB subdirectory. This will create the file 'ShadowDB.jar' in the project root directory.
-2) Compile Aneris: type 'make aneris'.
-3) Generate library file: type 'make lib'
+1) Compile ShadowDB using Apache Ant by simply typing 'ant' in the
+ShadowDB subdirectory. This will create the file 'ShadowDB.jar' in the
+project root directory.
 
-to generate everything type: 'make'
+2) To compile Aneris, type 'make aneris'.  This requires mlton,
+mlyacc, and mllex.  MLton can be downloaded from
+  http://sourceforge.net/projects/mlton/files/mlton/20100608/
+I did not have any luck installing the FreeBSD package using pkg_add,
+but extracting the archive was enough.  The archive already contains
+these three binaries.
+
+3) To generate the Nuprl library file, type 'make lib'
+
+NOTE: to generate everything type: 'make'
 
 CONFIGURATION
 -------------
