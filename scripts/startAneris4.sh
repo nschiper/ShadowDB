@@ -46,10 +46,10 @@ LOG_DIR="logs"
 FI_CMD=$ANERIS"/InjectFaults"
 
 # 2/3 consensus
-   if [ "$2" == "fi" ]; then
-     ${FI_CMD} $3 ${EVENTML_CMD} loc4 &
-   else
-     ${EVENTML_CMD} loc4 &
-   fi
+if [ "$2" = "fi" ]; then
+    ${FI_CMD} $3 ${EVENTML_CMD} loc4 &
+else
+    ${EVENTML_CMD} loc4 &
+fi
 
 echo "Started 2/3-consensus"

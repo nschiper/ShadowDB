@@ -45,6 +45,9 @@ clean:
 testdb:
 	(cd scripts; ./startDbServer.sh 1 stdalone)
 
+testrep:
+	(cd scripts; ./startDbServer.sh 1 replicated)
+
 testbank:
 	(cd scripts; ./startBankingClient.sh read-only 2 1 10 2)
 

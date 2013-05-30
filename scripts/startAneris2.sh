@@ -46,11 +46,11 @@ TIMESTAMP=`date +%d.%m.%y-%H:%M:%S`
 LOG_DIR="logs"
 
 # 2/3 consensus
-   if [ "$2" == "fi" ]; then
-     ${FI_CMD} $3 ${EVENTML_CMD} loc2 &
-   else
-     ${EVENTML_CMD} loc2 &
-   fi
+if [ "$2" = "fi" ]; then
+    ${FI_CMD} $3 ${EVENTML_CMD} loc2 &
+else
+    ${EVENTML_CMD} loc2 &
+fi
 
 sleep 10
 echo "Started 2/3-consensus"
