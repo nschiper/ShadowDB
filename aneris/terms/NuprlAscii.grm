@@ -1,0 +1,228 @@
+(* Copyright 2011 Cornell University
+ * Copyright 2012 Cornell University
+ * Copyright 2013 Cornell University
+ *
+ *
+ * This file is part of EventML - a tool aiming at specifying
+ * distributed protocols in an ML like language.  It is an interface
+ * to the logic of events and is compiled into Nuprl.  It is written
+ * by the NUPRL group of Cornell University, Ithaca, NY.
+ *
+ * EventML is a free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * EventML is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with EventML.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *  o Authors:     Vincent Rahli
+ *  o Affiliation: Cornell University, NUPRL group
+ *  o Date:        20 May 2011
+ *  o File name:   NuprlAscii.grm
+ *  o Description: Grammar for Nuprl terms in ascii forms.
+ *)
+
+
+structure E  = NuprlTerms
+structure EH = LibBase
+
+type 'a t  = unit -> 'a
+type 'a u  = bool -> 'a
+type 'a v  = (bool * string list) -> 'a
+(* the string list is the list of theory names to filter out *)
+
+fun isin_str str lst = List.exists (fn s : string => s = str) lst
+
+
+%%
+
+
+%name NuprlAscii
+
+%term
+  LPAREN
+| RPAREN
+| LBRACE
+| RBRACE
+| COLON
+| COMMA
+| SEMICOLON
+| OPID
+| SEP
+| ID of string
+| EOF
+
+%nonterm
+  terms        of E.nuprl_term list v
+| terms'       of E.nuprl_term list u
+| terms''      of E.nuprl_term list u
+| term         of E.nuprl_term option v
+| ident        of string t
+| tag          of E.tag t
+| parameter    of (string * string) t
+| parameters   of (string * string) list t
+| parameters'  of (string * string) list t
+| bound_term   of E.nuprl_bound_term u
+| bound_terms  of E.nuprl_bound_term list u
+| bound_terms' of E.nuprl_bound_term list u
+| sep_op       of unit t
+
+
+%pos int * int
+
+%eop EOF
+
+%noshift EOF
+
+%start terms
+
+
+%%
+
+terms :
+  term
+    (fn x =>
+	case term x of
+	    SOME t => [t]
+	  | NONE => [])
+| term terms
+    (fn x =>
+	let val term  = term  x
+	    val terms = terms x
+	in case term of
+	       SOME t => t :: terms
+	     | NONE => terms
+	end)
+
+terms'' :
+  term
+    (fn light =>
+	case term (light,[]) of
+	    SOME t => [t]
+	  | NONE => [])
+| term SEMICOLON terms''
+    (fn light =>
+	let val term  = term (light,[])
+	    val terms = terms'' light
+	in case term of
+	       SOME t => t :: terms
+	     | NONE => terms
+	end)
+
+terms' :
+    (fn _ => [])
+| terms''
+    (terms'')
+
+sep_op :
+    (fn () => ())
+| SEP
+    (fn () => ())
+
+tag :
+   (fn () => E.mk_tag "")
+| ident
+   (fn () =>
+       let val itag = ident ()
+       in if itag = E.default_dtag
+	  then E.dtag
+	  else E.mk_tag itag
+       end)
+(*tag :
+   (fn () => E.get_dtag ())
+| ident
+   (fn () =>
+       let val itag = ident ()
+       in if itag = E.default_dtag
+	  then E.get_dtag ()
+	  else E.mk itag
+       end)*)
+
+term :
+  LBRACE ident COLON tag parameters' RBRACE LPAREN bound_terms' RPAREN sep_op
+    (fn (light,lst) =>
+	let val opid = ident ()
+	in if isin_str opid lst
+	   then NONE
+	   else let val tag      = tag ()
+		    val params   = parameters' ()
+		    val b_terms  = bound_terms' light
+		    val _        = sep_op ()
+		in if light
+		   then SOME (E.mk_term   opid tag params b_terms)
+		   else SOME (E.make_term opid tag params b_terms)
+		end
+	end)
+| LBRACE RBRACE LPAREN terms' RPAREN sep_op
+    (fn (light,_) =>
+	let val terms = terms' light
+	    val _     = sep_op ()
+	in SOME (E.mk_nuprl_iwf_lemmas_term terms)
+	end)
+
+ident :
+  ID
+    (fn () => ID)
+
+parameter :
+  ident COLON ident
+    (fn () =>
+	let val id1 = ident1 ()
+	    val id2 = ident2 ()
+	in (id1, id2)
+	end)
+| COLON ident
+    (fn () =>
+	let val id = ident ()
+	in ("", id)
+	end)
+
+parameters :
+  parameter
+    (fn () => [parameter ()])
+| parameter COMMA parameters
+    (fn () =>
+      let val param  = parameter  ()
+	  val params = parameters ()
+      in param :: params
+      end)
+
+parameters' :
+    (fn () => [])
+| COMMA parameters
+    (parameters)
+
+bound_term :
+  term
+    (fn light =>
+	let val term = term (light,[])
+	in case term of
+	       SOME (E.TERM ((("bound_id", _), params), [E.B_TERM ([], b_term)])) =>
+	       let val b_vars = map (fn (v, _) => E.mk_new_nuprl_var v) params
+	       in E.B_TERM (b_vars, b_term)
+	       end
+	     | SOME (E.TERM ((("bound_id", _), _), _)) => raise EH.Impossible ""
+	     | SOME term => E.B_TERM ([], E.mk_rterm term)
+	     | NONE => raise Fail "parsing:bound_term"
+	end)
+
+bound_terms :
+  bound_term
+    (fn light => [bound_term light])
+| bound_term SEMICOLON bound_terms
+    (fn light =>
+	let val b_term  = bound_term  light
+	    val b_terms = bound_terms light
+	in b_term :: b_terms
+	end)
+
+bound_terms' :
+    (fn _ => [])
+| bound_terms
+    (bound_terms)

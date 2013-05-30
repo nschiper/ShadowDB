@@ -1,0 +1,441 @@
+(* Copyright 2011 Cornell University
+ * Copyright 2012 Cornell University
+ * Copyright 2013 Cornell University
+ *
+ *
+ * This file is part of EventML - a tool aiming at specifying
+ * distributed protocols in an ML like language.  It is an interface
+ * to the logic of events and is compiled into Nuprl.  It is written
+ * by the NUPRL group of Cornell University, Ithaca, NY.
+ *
+ * EventML is a free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * EventML is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with EventML.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *  o Authors:     Vincent Rahli
+ *  o Affiliation: Cornell University, NUPRL group
+ *  o Date:        20 May 2011
+ *  o File name:   mlton-control.sml.in
+ *  o Description: Initial interface when building the took with MLton.
+ *)
+
+
+val help1  = "To run EventML, type: eventml filename options"
+val help2  = ""
+val help3  = "options:"
+val help4  = "  -o filename"
+val help5  = "          If --nuprl is not used then filename has to be an Emacs Lisp"
+val help6  = "          file (with extension .el)."
+val help7  = "          Output files are generated based on filename."
+val help8  = "          For example, if filename is file.el then some files file-n.el"
+val help9  = "          will be generated.  A file file-finished.el should also be"
+val help10 = "          generated after the file-n.el files."
+val help11 = "          If --nuprl is used then filename will contain the Nuprl Ascii"
+val help12 ="           terms extracted from the input file."
+val help13 = ""
+val help14 = "  -t timelimit"
+val help15 = "          Specifies how long the enumerator is going to run."
+val help16 = ""
+val help17 = "  -lib filename"
+val help18 = "          Specifies a file containting a list of constants that can be"
+val help19 = "          imported in EventML."
+val help20 = ""
+val help21 = "  --nuprl"
+val help22 = "          Runs the type inferencer and if no errors converts the EventML"
+val help23 = "          program into NuPrl ascii terms."
+val help24 = ""
+val help25 = "  --ascii"
+val help26 = "          Parses the NuPrl ascii terms provided as input."
+val help27 = ""
+val help28 = "  --ascii-split"
+val help29 = "          Splits and then parses the NuPrl ascii terms provided as input."
+val help30 = ""
+val help31 = "  --obid object_id"
+val help32 = "          To use in combination with --nuprl to pass the object identifier"
+val help33 = "          to use for each generated term."
+val help34 = ""
+val help35 = "  --sanitizer"
+val help36 = "          Checks whether the conversion from EventML to NuPrl will be possible."
+val help37 = ""
+val help38 = "  --subtyping"
+val help39 = "          Allows subtyping."
+val help40 = ""
+val help41 = "  --session"
+val help42 = "          Start an EventML session."
+val help43 = ""
+val help44 = "  --nuprl-defs filename"
+val help45 = "          Specifies a file containting a list of Nuprl abstractions along with"
+val help46 = "          their well-formedness lemmas."
+val help47 = ""
+val help48 = "  --simul filename"
+val help49 = "          Specifies a configuration file to start a program simulation."
+val help50 = ""
+val help51 = "  --mono"
+val help52 = "          To generate non-polymorphic types."
+val help53 = ""
+val help54 = "  --host"
+val help55 = "          To specify a hostname."
+val help56 = ""
+val help57 = "  --port"
+val help58 = "          To specify a port number."
+val help59 = ""
+val help60 = "  --conf filename"
+val help61 = "          Runs an EventML program in a distributed environment using an"
+val help62 = "          EML configuration file."
+val help63 = ""
+val help64 = "  --client"
+val help65 = "          Start a client (uses an EML configuration file)."
+val help66 = ""
+val help67 = "  --send"
+val help68 = "          Sends all intial `intransit` messages (uses an EML conf. file)."
+val help69 = ""
+val help70 = "  --other"
+val help71 = "          Starts a `forward` machine (ues an EML configuration file)."
+val help72 = ""
+val help73 = "  --all"
+val help74 = "          Simulates all the machines (ues an EML configuration file)."
+val help75 = ""
+val help76 = "  --eval evaluator"
+val help77 = "          Pick one of our Nuprl evaluator (ev1-5)."
+val help78 = ""
+val help79 = "  --id identifier"
+val help80 = "          Specifies a machine identifier (replaces ip/port)."
+val help81 = ""
+val help82 = "  --gc"
+val help83 = "          To turn on explicit garbage collection."
+val help84 = ""
+val help85 = "  --help"
+val help86 = "          Displays this help text."
+val help   = help1  ^ "\n" ^ help2  ^ "\n" ^ help3  ^ "\n" ^ help4  ^ "\n" ^
+	     help5  ^ "\n" ^ help6  ^ "\n" ^ help7  ^ "\n" ^ help8  ^ "\n" ^
+	     help9  ^ "\n" ^ help10 ^ "\n" ^ help11 ^ "\n" ^ help12 ^ "\n" ^
+	     help13 ^ "\n" ^ help14 ^ "\n" ^ help15 ^ "\n" ^ help16 ^ "\n" ^
+	     help17 ^ "\n" ^ help18 ^ "\n" ^ help19 ^ "\n" ^ help20 ^ "\n" ^
+	     help21 ^ "\n" ^ help22 ^ "\n" ^ help23 ^ "\n" ^ help24 ^ "\n" ^
+	     help25 ^ "\n" ^ help26 ^ "\n" ^ help27 ^ "\n" ^ help28 ^ "\n" ^
+	     help29 ^ "\n" ^ help30 ^ "\n" ^ help31 ^ "\n" ^ help32 ^ "\n" ^
+	     help33 ^ "\n" ^ help34 ^ "\n" ^ help35 ^ "\n" ^ help36 ^ "\n" ^
+	     help37 ^ "\n" ^ help38 ^ "\n" ^ help39 ^ "\n" ^ help40 ^ "\n" ^
+	     help41 ^ "\n" ^ help42 ^ "\n" ^ help43 ^ "\n" ^ help44 ^ "\n" ^
+	     help45 ^ "\n" ^ help46 ^ "\n" ^ help47 ^ "\n" ^ help48 ^ "\n" ^
+	     help49 ^ "\n" ^ help50 ^ "\n" ^ help51 ^ "\n" ^ help52 ^ "\n" ^
+	     help53 ^ "\n" ^ help54 ^ "\n" ^ help55 ^ "\n" ^ help56 ^ "\n" ^
+	     help57 ^ "\n" ^ help58 ^ "\n" ^ help59 ^ "\n" ^ help60 ^ "\n" ^
+	     help61 ^ "\n" ^ help62 ^ "\n" ^ help63 ^ "\n" ^ help64 ^ "\n" ^
+	     help65 ^ "\n" ^ help66 ^ "\n" ^ help67 ^ "\n" ^ help68 ^ "\n" ^
+	     help69 ^ "\n" ^ help70 ^ "\n" ^ help71 ^ "\n" ^ help72 ^ "\n" ^
+	     help73 ^ "\n" ^ help74 ^ "\n" ^ help75 ^ "\n" ^ help76 ^ "\n" ^
+	     help77 ^ "\n" ^ help78 ^ "\n" ^ help79 ^ "\n" ^ help80 ^ "\n" ^
+	     help81 ^ "\n" ^ help82 ^ "\n" ^ help83 ^ "\n" ^ help84 ^ "\n" ^
+	     help85 ^ "\n" ^ help86 ^ "\n"
+
+type params = {output  : string option,
+	       lib     : string option,
+	       time    : LargeInt.int option,
+	       obid    : string,
+	       nuprl   : bool,
+	       ascii   : bool,
+	       split   : bool,
+	       sanity  : bool,
+	       help    : bool,
+	       sub     : bool,
+	       prt     : bool,
+	       sess    : bool,
+	       mono    : bool,
+	       defs    : string option,
+	       simul   : bool,
+	       conf    : string option,
+	       host    : string,
+	       port    : int,
+	       client  : bool,
+	       send    : bool,
+	       other   : bool,
+	       all     : bool,
+	       ev      : string option,
+	       id      : string,
+	       extra   : string,
+	       gc      : bool,
+	       file1   : string option,
+	       file2   : string option,
+	       monitor : bool,
+	       tolisp  : bool}
+
+val init = {input   = NONE,
+	    output  = NONE,
+	    lib     = NONE,
+	    time    = NONE,
+	    obid    = "",
+	    nuprl   = false,
+	    ascii   = false,
+	    split   = false,
+	    sanity  = false,
+	    help    = false,
+	    sub     = false,
+	    prt     = false,
+	    sess    = false,
+	    mono    = false,
+	    defs    = NONE,
+	    simul   = false,
+	    conf    = NONE,
+	    host    = "127.0.0.0",
+	    port    = 14567,
+	    client  = false,
+	    send    = false,
+	    other   = false,
+	    all     = false,
+	    ev      = NONE,
+	    id      = "",
+	    extra   = "",
+	    gc      = false,
+	    file1   = NONE,
+	    file2   = NONE,
+	    monitor = false,
+	    tolisp  = false}
+
+fun updateInput   {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} f = {input = f,     output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateOutput  {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} f = {input = input, output = f,      lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateLib     {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} f = {input = input, output = output, lib = f,   time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateTime    {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} t = {input = input, output = output, lib = lib, time = t,    nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateObid    {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} i = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = i,    ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateNuprl   {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = true,  obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateAscii   {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = true,  split = false, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateSplit   {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = true,  split = true,  sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateSanity  {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = true,   help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateHelp    {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = true, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateSub     {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = true, prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updatePrt     {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = true, sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateSess    {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = true, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateMono    {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = true, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateDefs    {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} f = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = f,    simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateSimul   {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = true,  conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateConf    {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} f = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = f,    host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateHost    {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} h = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = h,    port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updatePort    {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} p = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = p,    client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateClient  {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = true,   send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateSend    {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = true, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateOther   {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = true,  all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateAll     {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = true, ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateEv      {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} e = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = e,  id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateId      {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} i = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = i,  extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateExtra   {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} x = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = x,     gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateGc      {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = true, file1 = file1, file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateFile1   {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} f = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = f,     file2 = file2, monitor = monitor, tolisp = tolisp}
+fun updateFile2   {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp} f = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = f,     monitor = monitor, tolisp = tolisp}
+fun updateMonitor {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = true,    tolisp = tolisp}
+fun updateTolisp  {input, output, lib, time, nuprl, obid, ascii, split, sanity, help, sub, prt, sess, mono, defs, simul, conf, host, port, client, send, other, all, ev, id, extra, gc, file1, file2, monitor, tolisp}   = {input = input, output = output, lib = lib, time = time, nuprl = nuprl, obid = obid, ascii = ascii, split = split, sanity = sanity, help = help, sub = sub,  prt = prt,  sess = sess, mono = mono, defs = defs, simul = simul, conf = conf, host = host, port = port, client = client, send = send, other = other, all = all,  ev = ev, id = id, extra = extra, gc = gc,   file1 = file1, file2 = file2, monitor = monitor, tolisp = true}
+
+fun newTime r timelimit =
+    case LargeInt.fromString timelimit of
+	NONE   => r
+      | SOME t => updateTime r (SOME t)
+
+fun newPort r port =
+    case Int.fromString port of
+	NONE   => r
+      | SOME t => updatePort r t
+
+fun format [] r = r
+  | format ("--ascii"                   :: list) r = format list (updateAscii   r)
+  | format ("-ascii"                    :: list) r = format list (updateAscii   r)
+  | format ("--ascii-split"             :: list) r = format list (updateSplit   r)
+  | format ("-ascii-split"              :: list) r = format list (updateSplit   r)
+  | format ("--sanitizer"               :: list) r = format list (updateSanity  r)
+  | format ("-sanitizer"                :: list) r = format list (updateSanity  r)
+  | format ("--subtyping"               :: list) r = format list (updateSub     r)
+  | format ("-subtyping"                :: list) r = format list (updateSub     r)
+  | format ("--help"                    :: list) r = format list (updateHelp    r)
+  | format ("-help"                     :: list) r = format list (updateHelp    r)
+  | format ("--print"                   :: list) r = format list (updatePrt     r)
+  | format ("-print"                    :: list) r = format list (updatePrt     r)
+  | format ("--nuprl"                   :: list) r = format list (updateNuprl   r)
+  | format ("-nuprl"                    :: list) r = format list (updateNuprl   r)
+  | format ("--session"                 :: list) r = format list (updateSess    r)
+  | format ("-session"                  :: list) r = format list (updateSess    r)
+  | format ("--mono"                    :: list) r = format list (updateMono    r)
+  | format ("-mono"                     :: list) r = format list (updateMono    r)
+  | format ("--client"                  :: list) r = format list (updateClient  r)
+  | format ("-client"                   :: list) r = format list (updateClient  r)
+  | format ("--send"                    :: list) r = format list (updateSend    r)
+  | format ("-send"                     :: list) r = format list (updateSend    r)
+  | format ("--other"                   :: list) r = format list (updateOther   r)
+  | format ("-other"                    :: list) r = format list (updateOther   r)
+  | format ("--all"                     :: list) r = format list (updateAll     r)
+  | format ("-all"                      :: list) r = format list (updateAll     r)
+  | format ("--gc"                      :: list) r = format list (updateGc      r)
+  | format ("-gc"                       :: list) r = format list (updateGc      r)
+  | format ("--monitor"                 :: list) r = format list (updateMonitor r)
+  | format ("-monitor"                  :: list) r = format list (updateMonitor r)
+  | format ("--tolisp"                  :: list) r = format list (updateTolisp  r)
+  | format ("-tolisp"                   :: list) r = format list (updateTolisp  r)
+  | format ("--simul"                   :: list) r = format list (updateSimul   r)
+  | format ("-simul"                    :: list) r = format list (updateSimul   r)
+  | format ("--extra"      :: str       :: list) r = format list (updateExtra   r str)
+  | format ("-extra"       :: str       :: list) r = format list (updateExtra   r str)
+  | format ("--host"       :: host      :: list) r = format list (updateHost    r host)
+  | format ("-host"        :: host      :: list) r = format list (updateHost    r host)
+  | format ("--obid"       :: obid      :: list) r = format list (updateObid    r obid)
+  | format ("-obid"        :: obid      :: list) r = format list (updateObid    r obid)
+  | format ("--port"       :: port      :: list) r = format list (newPort       r port)
+  | format ("-port"        :: port      :: list) r = format list (newPort       r port)
+  | format ("--t"          :: timelimit :: list) r = format list (newTime       r timelimit)
+  | format ("-t"           :: timelimit :: list) r = format list (newTime       r timelimit)
+  | format ("--time"       :: timelimit :: list) r = format list (newTime       r timelimit)
+  | format ("-time"        :: timelimit :: list) r = format list (newTime       r timelimit)
+  | format ("--id"         :: id        :: list) r = format list (updateId      r id)
+  | format ("-id"          :: id        :: list) r = format list (updateId      r id)
+  | format ("--eval"       :: eval      :: list) r = format list (updateEv      r (SOME eval))
+  | format ("-eval"        :: eval      :: list) r = format list (updateEv      r (SOME eval))
+  | format ("--conf"       :: file      :: list) r = format list (updateConf    r (SOME file))
+  | format ("-conf"        :: file      :: list) r = format list (updateConf    r (SOME file))
+  | format ("--o"          :: output    :: list) r = format list (updateOutput  r (SOME output))
+  | format ("-o"           :: output    :: list) r = format list (updateOutput  r (SOME output))
+  | format ("--output"     :: output    :: list) r = format list (updateOutput  r (SOME output))
+  | format ("-output"      :: output    :: list) r = format list (updateOutput  r (SOME output))
+  | format ("--i"          :: input     :: list) r = format list (updateInput   r (SOME input))
+  | format ("-i"           :: input     :: list) r = format list (updateInput   r (SOME input))
+  | format ("--input"      :: input     :: list) r = format list (updateInput   r (SOME input))
+  | format ("-input"       :: input     :: list) r = format list (updateInput   r (SOME input))
+  | format ("--lib"        :: lib       :: list) r = format list (updateLib     r (SOME lib))
+  | format ("-lib"         :: lib       :: list) r = format list (updateLib     r (SOME lib))
+  | format ("--nuprl-defs" :: defs      :: list) r = format list (updateDefs    r (SOME defs))
+  | format ("-nuprl-defs"  :: defs      :: list) r = format list (updateDefs    r (SOME defs))
+  | format ("--file1"      :: file      :: list) r = format list (updateFile1   r (SOME file))
+  | format ("-file1"       :: file      :: list) r = format list (updateFile1   r (SOME file))
+  | format ("--file2"      :: file      :: list) r = format list (updateFile2   r (SOME file))
+  | format ("-file2"       :: file      :: list) r = format list (updateFile2   r (SOME file))
+  | format _ _ =  raise Fail "wrong arguments"
+
+fun slicerArgs (name, args) =
+    let val (input, r) =
+	    case args of
+		[] => raise Fail help
+	      | ("--help" :: _) => ("", updateHelp init)
+	      | (input :: list) =>
+		if String.isPrefix "--" input
+		then ("", format args init)
+		else (input, format list init)
+	val tail = (  case #output r of SOME file => [Interface.O      file] | NONE => [])
+		   @ (case #lib    r of SOME file => [Interface.L      file] | NONE => [])
+		   @ (case #time   r of SOME time => [Interface.T      time] | NONE => [])
+		   @ (case #defs   r of SOME file => [Interface.DEF    file] | NONE => [])
+		   @ (case #conf   r of SOME file => [Interface.CONF   file] | NONE => [])
+		   @ (case #ev     r of SOME eval => [Interface.EV     eval] | NONE => [])
+		   @ (case #file1  r of SOME file => [Interface.FILE1  file] | NONE => [])
+		   @ (case #file2  r of SOME file => [Interface.FILE2  file] | NONE => [])
+		   @ (if #simul   r then [Interface.SIMUL]     else [])
+		   @ (if #sub     r then [Interface.SUBTYPING] else [])
+		   @ (if #mono    r then [Interface.MONO]      else [])
+		   @ (if #split   r then [Interface.SPLIT]     else [])
+		   @ (if #prt     r then [Interface.PRINT]     else [])
+		   @ (if #client  r then [Interface.CLIENT]    else [])
+		   @ (if #send    r then [Interface.SEND]      else [])
+		   @ (if #other   r then [Interface.OTHER]     else [])
+		   @ (if #all     r then [Interface.ALL]       else [])
+		   @ (if #gc      r then [Interface.GC]        else [])
+		   @ (if #monitor r then [Interface.MONITOR]   else [])
+		   @ (if #tolisp  r then [Interface.TOLISP]    else [])
+		   @ [Interface.OBID  (#obid  r),
+		      Interface.HOST  (#host  r),
+		      Interface.PORT  (#port  r),
+		      Interface.ID    (#id    r),
+		      Interface.EXTRA (#extra r)]
+	val input =
+	    case input of
+		"" =>
+		(case #input r of
+		     SOME file => file
+		   | NONE => input)
+	      | _ => input
+	val f = if #help r
+		then raise Fail help
+		else case (#nuprl r, #ascii r, #sanity r, #sess r) of
+			 (true,  true,  _,     _)     => raise Fail "The options --nuprl and --ascii cannot be used together."
+		       | (true,  _,     true,  _)     => raise Fail "The options --nuprl and --sanity cannot be used together."
+		       | (_,     true,  true,  _)     => raise Fail "The options --ascii and --sanity cannot be used together."
+		       | (true,  _,     _,     true)  => raise Fail "The options --nuprl and --session cannot be used together."
+		       | (_,     true,  _,     true)  => raise Fail "The options --ascii and --session cannot be used together."
+		       | (_,     _,     true,  true)  => raise Fail "The options --sanity and --session cannot be used together."
+		       | (false, false, false, true)  => (fn () => Interface.run ([Interface.I input, Interface.SESSION]   @ tail))
+		       | (true,  false, false, false) => (fn () => Interface.run ([Interface.I input, Interface.TONUPRL]   @ tail))
+		       | (false, false, true,  false) => (fn () => Interface.run ([Interface.I input, Interface.SANITY]    @ tail))
+		       | (false, false, false, false) => (fn () => Interface.run ([Interface.I input]                      @ tail))
+		       | (false, true,  false, false) => (fn () => Interface.run ([Interface.I input, Interface.FROMASCII] @ tail))
+	val _ = f ()
+    in ()
+    end (*handle Fail st => print (st)
+	     | LibBase.Impossible    st => print ("an internal error occurred (" ^ st ^ ")")
+	     | LibBase.Unimplemented st => print ("some feature has not been implemented (" ^ st ^ ")")
+	     (*| _ => print "an unknown error occurred"*)*)
+
+fun slice () = slicerArgs (CommandLine.name (), CommandLine.arguments ())
+
+val default_def = Interface.DEF "/usr/fdl/lib/alldefs"
+val default_lib = Interface.L "/usr/fdl/lib/alldefs.eml"
+
+fun sliceProfile1 () =
+    Interface.run [Interface.I "alldefs",
+		   Interface.TONUPRL]
+
+fun sliceProfile2 () =
+    Interface.run [Interface.I    "foo.eml",
+		   Interface.EVAL "foo();;",
+		   default_lib,
+		   default_def]
+
+fun sliceProfile3 () =
+    Interface.run [Interface.I     "robust-simple-consensus-v4.esh",
+		   Interface.EV    "ev2b",
+		   Interface.SIMUL,
+		   Interface.CONF  "conf_sc3.emlc",
+		   Interface.L     "alldefs.eml",
+		   Interface.DEF   "alldefs"]
+
+fun sliceProfile4 () =
+    Interface.run [Interface.I    "robust-simple-consensus-v4.esh",
+		   Interface.EV   "ev2b",
+		   Interface.ALL,
+		   Interface.CONF "conf_sc3.emlc",
+		   Interface.L    "alldefs.eml",
+		   Interface.DEF  "alldefs"]
+
+fun sliceProfile5 () =
+    Interface.run [Interface.I     "robust-simple-consensus-v4.esh",
+		   Interface.EV    "ev2b",
+		   Interface.CONF  "conf_sc3.emlc",
+		   Interface.L     "alldefs.eml",
+		   Interface.DEF   "alldefs",
+		   Interface.ID    "l1",
+		   Interface.EXTRA "30"]
+
+fun sliceProfile6 () =
+    Interface.run [Interface.I     "LeaderRing-V2.esh",
+		   Interface.EV    "ev2b",
+		   Interface.SIMUL,
+		   Interface.CONF  "conf_ler.emlc",
+		   Interface.L     "alldefs.eml",
+		   Interface.DEF   "alldefs"]
+
+fun sliceProfile7 () =
+    Interface.run [Interface.I     "pax_opt3.prog",
+		   Interface.EV    "ev2b",
+		   Interface.SIMUL,
+		   Interface.CONF  "conf_paxos.emlc",
+		   Interface.L     "alldefs.eml",
+		   Interface.DEF   "alldefs"]
+
+fun paxos () =
+    Interface.run [Interface.I     "pax_opt3.prog",
+		   Interface.SIMUL,
+		   Interface.CONF  "conf_paxos.emlc",
+		   Interface.L     "alldefs.eml",
+		   Interface.DEF   "alldefs",
+		   Interface.EXTRA "newprog"]

@@ -25,11 +25,16 @@
 #  o File name:   Makefile
 #
 
+shadowdb:
+	(cd ShadowDB; ant)
+
+aneris:
+	(cd aneris; make bin)
+
 install:
 	(cd lib; tar -xvzf alldefs.tar.gz 2>/dev/null)
 
-shadowdb:
-	(cd ShadowDB; ant)
+default: install shadowdb aneris
 
 clean:
 	rm jars/ShadowDB.jar

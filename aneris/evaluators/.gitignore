@@ -1,0 +1,7 @@
+.cm
+*.grm.desc
+*.grm.sml
+*.grm.sig
+*.lex.sml
+foo*
+eval*.sml

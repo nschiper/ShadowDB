@@ -1,0 +1,11 @@
+*.lex.sml
+*.grm.sig
+*.grm.sml
+.cm
+*.tes
+nuprlAsciiLex.ml
+nuprlAsciiParse.mli
+nuprlAsciiParse.ml
+configLex.ml
+configParse.ml
+configParse.mli

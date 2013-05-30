@@ -1,0 +1,2885 @@
+(* Copyright 2011 Cornell University
+ * Copyright 2012 Cornell University
+ * Copyright 2013 Cornell University
+ *
+ *
+ * This file is part of EventML - a tool aiming at specifying
+ * distributed protocols in an ML like language.  It is an interface
+ * to the logic of events and is compiled into Nuprl.  It is written
+ * by the NUPRL group of Cornell University, Ithaca, NY.
+ *
+ * EventML is a free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * EventML is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with EventML.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *  o Authors:     Vincent Rahli
+ *  o Affiliation: Cornell University, NUPRL group
+ *  o Date:        20 May 2011
+ *  o File name:   EML.grm
+ *  o Description: EventML grammar.
+ *)
+
+
+structure A  = Ast
+structure R  = Reg
+structure F  = Infix
+structure PD = ParseDefs
+structure EH = LibBase
+
+type 'a t = unit -> 'a
+type 'a u = R.region list -> 'a
+type 'a v = (string * R.region list) -> 'a
+type 'a w = string -> 'a
+
+fun getRegion left right = R.getRegionList left right
+
+fun mk_pexp exp = A.mk_new_pterm A.PROP_EXP "" [] [] [exp]
+
+fun atexp2exp atexp = A.mk_new_pterm A.EXP_ATEXP "" [] [] [atexp]
+
+%%
+
+
+%name EML
+
+
+%term
+  SBIND
+| LBRACE
+| RBRACE
+| LLIST
+| RLIST
+| COMMA
+| LPAREN
+| RPAREN
+| CBVA
+| TYPEARROW
+| FUNARROW
+| IFF
+| TYPE
+| TYPEOF
+| CLASSOPT
+| CLASSOPTC
+| STAR
+| PLUS
+| SQMINUS
+| PIPE
+| EQUALOP
+| EQEQUALOP
+| BAND
+| BOR
+| PAND
+| POR
+| FORALL
+| EXISTS
+| LET
+| LETREC
+| CLASS
+| CLASSREC
+| IN
+| FN
+| IF
+| THEN
+| ELSE
+| WILD
+| COLON
+| DCOLON
+| SEMICOLON
+| OVERLOAD
+| DOT
+| BACKSLASH
+| PRIOR
+| ONCE
+| SENDOC
+| ONLOC
+| STATEC
+| MEMORYC
+| SKIP
+| WAIT
+| NULLCLS
+| AT
+| APPEND
+| CONS
+| PARAM
+| ON
+| TAND
+| ASSUME
+| GUARANTEE
+| INVARIANT
+| ORDERING
+| PROGRESS
+| CONSIST
+| MEMORY
+| VARIABLE
+| OPTIONS
+| IMPORT
+| EXPORT
+| INCLUDE
+| INTERFACE
+| ANY
+| SELF
+| CASE
+| MSG
+| INTERNAL
+| OUTPUT
+| INPUT
+| OF
+| INFIX
+| INFIXR
+| WITH
+| WHERE
+| QUOTIENT
+| OP
+| STRUCT
+| SPEC
+| MAIN
+| DATA
+| ABSTYPE
+| COMP
+| CLSCOMP
+| BIGCOMP
+| OBSERVES
+| SET
+| MAP
+| ID      of string
+| NUM     of string
+| TYPEVAR of string
+| INT     of string
+| WORD    of string
+| REAL    of string
+| ATOM    of string
+| ATOMS   of string
+| STRING  of string
+| CHAR    of string
+| FILE    of string
+| DOC     of string list
+| EOF
+
+
+%nonterm
+  d_opt            of int    t
+| eqsep            of unit   t
+| prog             of A.term t
+| spec             of A.term t
+| scon             of A.term u
+| prop             of A.term u
+| exp              of A.term u
+| expbool          of A.term u
+| atexp            of A.term u
+| atexp'           of A.term u
+| infexp           of A.term u
+| consty           of A.term u
+| spconsty         of A.term u
+| tycon            of A.term u
+| typeseq          of A.term t
+| otypeseq         of A.term t
+| typevarseq       of A.term t
+| typ              of A.term u
+| typc             of A.term u
+| tupty            of A.term u
+| atty             of A.term u
+| ident            of A.term u
+| identid          of A.term u
+| identidid        of A.term u
+| identop          of A.term u
+| identeq          of A.term u
+| typevar          of A.term t
+| tyvar            of A.term t
+| bind             of A.term t
+| dec              of A.term t
+| dec'             of A.term w
+| includeparm      of A.term t
+| includeparms     of A.term t
+| dcons            of A.term t
+| paramdec         of A.term t
+| invariantdec     of A.term w
+| consdec          of A.term t
+| atpat            of A.term u
+| atpat'           of A.term u
+| atpat''          of A.term u
+| pat              of A.term u
+| pat'             of A.term u
+| infpat           of A.term u
+| atoms            of A.term t
+| mrule            of A.term t
+| match            of A.term t
+| typeseqset       of A.term t
+| arg              of A.term t
+| arg'             of A.term t
+| args             of A.term t
+| args'            of A.term t
+| casepat          of A.term u
+| identlist        of A.term u
+| absfuns          of A.term t
+| idents           of A.term list u
+| tycons           of A.term list u
+| spec'            of A.term list t
+| decs             of A.term list w
+| maindec          of A.term list w
+| maininvs         of A.term list t
+| mrules           of A.term list t
+| patseq           of A.term list t
+| absfunlist       of A.term list t
+| idpatseq         of (A.term * A.term) t
+| appexp           of A.term u F.tree list
+| apppat           of A.term u F.tree list
+| compsep          of (R.region * string) t
+| msgkind          of (string * R.region list) t
+| atomlist         of (string * R.region list) t
+| includeparmlist  of (A.term list * R.region list) t
+| datacons         of (A.term list * R.region list) t
+| typetuple        of (A.term list * R.region list) u
+| typetupleexp     of (A.term list * R.region list) t
+| typeseqcomma     of (A.term list * R.region list) t
+| typevarseqcomma  of (A.term list * R.region list) t
+| explist          of (A.term list * R.region list) t
+| neexplist        of (A.term list * R.region list) t
+| atexptuple       of (A.term list * R.region list) t
+| patlist          of (A.term list * R.region list) t
+| nepatlist        of (A.term list * R.region list) t
+| atpattuple       of (A.term list * R.region list) t
+| typeseqlist      of (A.term list * R.region list) t
+| arglist          of (A.term list * R.region list) t
+| arglist'         of (A.term list * R.region list) t
+| expcomp          of (A.term list * A.term option * R.region list * bool) u
+
+%nonassoc IN
+%nonassoc ON
+%nonassoc TAND
+%nonassoc DOT
+%nonassoc QUOTIENT
+%nonassoc EQEQUALOP
+%nonassoc DCOLON
+%left  COMMA
+%left  PIPE
+%right TYPEARROW
+%left  PLUS
+%left  EQUALOP
+%left  SEMICOLON
+%left  STAR
+%right FUNARROW
+%right SBIND
+%left  ELSE
+%right BOR
+%right BAND
+%right POR
+%right PAND
+%right IFF
+%left  COLON
+%right COMP
+%right CLSCOMP
+%right BIGCOMP
+
+
+%pos R.pos
+
+
+%eop EOF
+
+
+%noshift EOF
+
+
+%start prog
+
+
+%verbose
+
+
+%%
+
+
+prog :
+  spec' decs
+    (fn () =>
+	let val spec  = spec' ()
+	    val name  = (A.getSpecName (hd spec)) handle _ => ""
+	    val decs  = decs name
+	    val pfile = A.mk_new_term A.FILE_F (PD.getFile ()) [] (spec @ decs)
+	in A.mk_new_term A.PROG_P "" [] [pfile]
+	end)
+
+spec' :
+    (fn () => [])
+| spec
+    (fn () => [spec ()])
+
+spec :
+  SPEC ident SEMICOLON SEMICOLON
+    (fn () =>
+	let val iregs1 = R.getRegionList SPECright identleft
+	    val iregs2 = R.getRegionList identright SEMICOLONleft
+	    val id     = ident (iregs1 @ iregs2)
+	    val reg    = R.consReg SPECleft SPECright
+	in A.mk_new_term A.DEC_SPEC "" [reg] [id]
+	end)
+| SPEC ident
+    (fn () =>
+	let val iregs = R.getRegionList SPECright identleft
+	    val id    = ident iregs
+	    val reg   = R.consReg SPECleft SPECright
+	in A.mk_new_term A.DEC_SPEC "" [reg] [id]
+	end)
+
+decs :
+    (fn name => [])
+| maindec
+    (maindec)
+| dec' decs
+    (fn name =>
+	let val dec  = dec' name
+	    val decs = decs name
+	in dec :: decs
+	end)
+| dec' SEMICOLON SEMICOLON decs
+    (fn name =>
+	let val dec  = dec' name
+	    val decs = decs name
+	in dec :: decs
+	end)
+| dec SEMICOLON SEMICOLON decs
+    (fn name =>
+	let val dec  = dec ()
+	    val decs = decs name
+	in dec :: decs
+	end)
+
+maindec :
+  MAIN exp maininvs
+    (fn name =>
+	 let val eregs = R.getRegionList MAINright expleft
+	     val reg   = R.consReg MAINleft MAINright
+	     val exp   = exp eregs
+	     val dec   = A.mk_new_term A.DEC_MAIN "" [reg] [exp]
+	     val invs  = maininvs ()
+	 in dec :: invs
+	 end)
+| MAIN exp SEMICOLON SEMICOLON maininvs
+    (fn name =>
+	 let val eregs = R.getRegionList MAINright expleft
+	     val reg   = R.consReg MAINleft MAINright
+	     val exp   = exp eregs
+	     val dec   = A.mk_new_term A.DEC_MAIN "" [reg] [exp]
+	     val invs  = maininvs ()
+	 in dec :: invs
+	 end)
+
+maininvs :
+    (fn () => [])
+| invariantdec maininvs
+    (fn () =>
+	let val dec  = invariantdec "main"
+	    val decs = maininvs ()
+	in dec :: decs
+	end)
+| invariantdec SEMICOLON SEMICOLON maininvs
+    (fn () =>
+	let val dec  = invariantdec "main"
+	    val decs = maininvs ()
+	in dec :: decs
+	end)
+
+atomlist :
+  ATOM
+    (fn () =>
+	let val reg = R.consReg ATOMleft ATOMright
+	in (ATOM, [reg])
+	end)
+| ATOM SEMICOLON atomlist
+    (fn () =>
+	let val reg1 = R.consReg ATOMleft ATOMright
+	    val reg2 = R.consReg SEMICOLONleft SEMICOLONright
+	    val (atoms, regs) = atomlist ()
+	in (ATOM ^ "```" ^ atoms, reg1 :: reg2 :: regs)
+	end)
+
+atoms :
+  ATOMS
+    (fn () =>
+	let val toks = String.tokens (fn #" " => true | _ => false) ATOMS
+	    val reg  = R.consReg ATOMSleft ATOMSright
+	    val n    = List.length toks
+            val str  = ListFormat.fmt {init = "", final = "", sep = "```", fmt = fn x => x} toks
+	in if n = 0
+	   then raise PD.ParseError ("Empty list of atoms using double backquotes are not allowed", [reg])
+	   else A.mk_new_term A.ATOMS_ATOMS str [reg] []
+	end)
+| LLIST atomlist RLIST
+    (fn () =>
+	let val (atoms, regs) = atomlist ()
+	    val reg1  = R.consReg LLISTleft LLISTright
+	    val reg2  = R.consReg RLISTleft RLISTright
+	in A.mk_new_term A.ATOMS_LIST atoms ([reg1] @ regs @ [reg2]) []
+	end)
+
+msgkind :
+  INTERNAL
+    (fn () => ("internal", [R.consReg INTERNALleft INTERNALright]))
+| OUTPUT
+    (fn () => ("output", [R.consReg OUTPUTleft OUTPUTright]))
+| INPUT
+    (fn () => ("input", [R.consReg INPUTleft INPUTright]))
+
+arg :
+  arg'
+    (arg')
+| ident args' COLON typc
+    (fn () =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val id    = ident []
+	    val args  = args' ()
+	    val ty    = typc tregs
+	    val reg   = R.consReg COLONleft COLONright
+	in A.mk_new_term A.ARG_A "" [reg] [id, args, ty]
+	end)
+
+arg' :
+  ident COLON typc
+    (fn () =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val iregs = R.getRegionList identright COLONleft
+	    val id    = ident iregs
+	    val ty    = typc tregs
+	    val args  = A.mk_new_term A.ARGS_EM "" [] []
+	    val reg   = R.consReg COLONleft COLONright
+	in A.mk_new_term A.ARG_A "" [reg] [id, args, ty]
+	end)
+| OP COLON typc
+    (fn () =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val iregs = R.getRegionList OPright COLONleft
+	    val opreg = R.consReg OPleft OPright
+	    val id    = A.mk_new_pterm A.ID_VID "op" [opreg] iregs []
+	    val ty    = typc tregs
+	    val args  = A.mk_new_term A.ARGS_EM "" [] []
+	    val reg   = R.consReg COLONleft COLONright
+	in A.mk_new_term A.ARG_A "" [reg] [id, args, ty]
+	end)
+| tyvar COLON ID
+    (fn () =>
+	let val tv   = tyvar ()
+	    val reg  = R.consReg COLONleft COLONright
+	    val treg = R.consReg IDleft IDright
+	in if ID = "Type"
+	   then A.mk_new_term A.ARG_T "" [reg, treg] [tv]
+	   else raise PD.ParseError ("type variable can only have type Type", [treg])
+	end)
+
+
+arglist :
+  arg
+    (fn () =>
+	let val arg = arg ()
+	in ([arg], [])
+	end)
+| arg SEMICOLON arglist
+    (fn () =>
+	let val arg = arg ()
+	    val (args, regs) = arglist ()
+	    val reg = R.consReg SEMICOLONleft SEMICOLONright
+	in (arg :: args, reg :: regs)
+	end)
+
+arglist' :
+  arg'
+    (fn () =>
+	let val arg = arg' ()
+	in ([arg], [])
+	end)
+| arg' SEMICOLON arglist'
+    (fn () =>
+	let val arg = arg' ()
+	    val (args, regs) = arglist' ()
+	    val reg = R.consReg SEMICOLONleft SEMICOLONright
+	in (arg :: args, reg :: regs)
+	end)
+
+args :
+  LPAREN RPAREN
+    (fn () =>
+	let val reg1 = R.consReg LPARENleft LPARENright
+	    val reg2 = R.consReg RPARENleft RPARENright
+	in A.mk_new_term A.ARGS_PSEQ "" ([reg1, reg2]) []
+	end)
+| LPAREN arglist RPAREN
+    (fn () =>
+	let val (args, regs) = arglist ()
+	    val reg1 = R.consReg LPARENleft LPARENright
+	    val reg2 = R.consReg RPARENleft RPARENright
+	in A.mk_new_term A.ARGS_PSEQ "" ([reg1] @ regs @ [reg2]) args
+	end)
+
+args' :
+  LLIST RLIST
+    (fn () =>
+	let val reg1 = R.consReg LLISTleft LLISTright
+	    val reg2 = R.consReg RLISTleft RLISTright
+	in A.mk_new_term A.ARGS_LSEQ "" ([reg1, reg2]) []
+	end)
+| LLIST arglist' RLIST
+    (fn () =>
+	let val (args, regs) = arglist' ()
+	    val reg1 = R.consReg LLISTleft LLISTright
+	    val reg2 = R.consReg RLISTleft RLISTright
+	in A.mk_new_term A.ARGS_LSEQ "" ([reg1] @ regs @ [reg2]) args
+	end)
+
+d_opt :
+  INT
+    (fn () =>
+	Option.valOf (Int.fromString INT)
+	handle Option   => raise EH.Impossible ""
+	     | Overflow => raise EH.Impossible "")
+| NUM
+    (fn () =>
+	Option.valOf (Int.fromString NUM)
+	handle Option   => raise EH.Impossible ""
+	     | Overflow => raise EH.Impossible "")
+|   (fn () => 0)
+
+dec :
+  invariantdec
+    (fn name => invariantdec "")
+|  LET bind
+    (fn () =>
+	let val bind = bind ()
+	    val reg = R.consReg LETleft LETright
+	in A.mk_new_term A.DEC_LET "" [reg] [bind]
+	end)
+| CLASS bind
+    (fn () =>
+	let val bind = bind ()
+	    val reg = R.consReg CLASSleft CLASSright
+	in A.mk_new_term A.DEC_CLASS "" [reg] [bind]
+	end)
+| CLASSREC bind
+    (fn () =>
+	let val bind = bind ()
+	    val reg = R.consReg CLASSRECleft CLASSRECright
+	in let val (id, arg, X, Y) = A.get_rec_bind_components bind
+	   in A.mk_new_term A.DEC_CLASSREC "" [reg] [id, arg, X, Y]
+	   end handle Fail msg => raise PD.ParseError (msg, [reg])
+	end)
+| LETREC bind
+    (fn () =>
+	let val bind = bind ()
+	    val reg = R.consReg LETRECleft LETRECright
+	in A.mk_new_term A.DEC_LETR "" [reg] [bind]
+	end)
+| ABSTYPE tycon EQUALOP typ WITH absfuns
+    (fn name =>
+	let val cregs1 = R.getRegionList ABSTYPEright tyconleft
+	    val cregs2 = R.getRegionList tyconright   EQUALOPleft
+	    val tregs1 = R.getRegionList EQUALOPleft  typleft
+	    val tregs2 = R.getRegionList typright     WITHleft
+	    val tycon  = tycon (cregs1 @ cregs2)
+	    val typ    = typ (tregs1 @ tregs2)
+	    val binds  = absfuns ()
+	    val reg1   = R.consReg ABSTYPEright ABSTYPEleft
+	    val reg2   = R.consReg EQUALOPright EQUALOPleft
+	    val reg3   = R.consReg WITHright    WITHleft
+	in A.mk_new_term A.DEC_ABSTYPE "" [] [tycon, typ, binds]
+	end)
+
+absfuns :
+  absfunlist
+    (fn () =>
+	let val lst = absfunlist ()
+	in A.mk_new_term A.BINDS_LIST "" [] lst
+	end)
+
+absfunlist :
+  bind
+    (fn () => [bind ()])
+| bind TAND absfunlist
+    (fn () => bind () :: absfunlist ())
+
+includeparm :
+  ident EQUALOP atexp'
+    (fn () =>
+	let val iregs = R.getRegionList identright   EQUALOPleft
+	    val eregs = R.getRegionList EQUALOPright atexp'left
+	    val id    = ident iregs
+	    val exp   = atexp' eregs
+	    val reg   = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_new_term A.INCPARM_EXP "" [reg] [id, exp]
+	end)
+| TYPE ident EQUALOP typ
+    (fn () =>
+	let val iregs1 = R.getRegionList TYPEright identleft
+	    val iregs2 = R.getRegionList identright EQUALOPleft
+	    val tregs  = R.getRegionList EQUALOPright typleft
+	    val id     = ident (iregs1 @ iregs2)
+	    val ty     = typ tregs
+	    val reg1   = R.consReg TYPEleft    TYPEright
+	    val reg2   = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_new_term A.INCPARM_TYP "" [reg1, reg2] [id, ty]
+	end)
+| INTERFACE ident EQUALOP atoms
+    (fn () =>
+	let val iregs1 = R.getRegionList INTERFACEright identleft
+	    val iregs2 = R.getRegionList identright EQUALOPleft
+	    val id     = ident (iregs1 @ iregs2)
+	    val atoms  = atoms ()
+	    val reg1   = R.consReg INTERFACEleft INTERFACEright
+	    val reg2   = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_new_term A.INCPARM_INT "" [reg1, reg2] [id, atoms]
+	end)
+
+includeparmlist :
+  includeparm
+    (fn () => ([includeparm ()], []))
+| includeparm TAND includeparmlist
+    (fn () =>
+	let val x = includeparm ()
+	    val (xs, regs) = includeparmlist ()
+	    val reg = R.consReg TANDleft TANDright
+	in (x :: xs, reg :: regs)
+	end)
+
+includeparms :
+  includeparmlist
+    (fn () =>
+	let val (xs, regs) = includeparmlist ()
+	in A.mk_new_term A.INCPARMS_P "" regs xs
+	end)
+
+dec' :
+  consdec
+    (fn name => consdec ())
+| paramdec
+    (fn name => paramdec ())
+| TYPE tycon EQUALOP typ
+    (fn name =>
+	let val tregs = R.getRegionList EQUALOPright typleft
+	    val sreg  = R.consReg (R.downPos tyconleft) (R.downPos tyconleft)
+	    val tvseq = A.mk_new_term A.TYPEVARSEQ_EM "" [sreg] []
+	    val tycon = tycon []
+	    val ty    = typ tregs
+	    val reg1  = R.consReg TYPEleft TYPEright
+	    val reg2  = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_new_term A.DEC_TYFUN "" [reg1, reg2] [tvseq, tycon, ty]
+	end)
+| TYPE typevarseq tycon EQUALOP typ
+    (fn name =>
+	let val tregs = R.getRegionList EQUALOPright typleft
+	    val tvseq = typevarseq()
+	    val tycon = tycon []
+	    val ty    = typ tregs
+	    val reg1  = R.consReg TYPEleft TYPEright
+	    val reg2  = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_new_term A.DEC_TYFUN "" [reg1, reg2] [tvseq, tycon, ty]
+	end)
+| msgkind ident COLON typ
+    (fn name =>
+	let val iregs = R.getRegionList identright COLONleft
+	    val tregs = R.getRegionList COLONright typleft
+	    val id    = ident []
+	    val typ   = typ []
+	    val (str, regs) = msgkind ()
+	    val r     = R.consReg identleft identright
+	    val i     = A.getIdIdent id
+	    val toks  = if str = "internal" andalso name <> "" then [name, i] else [i]
+            val hdr   = ListFormat.fmt {init = "", final = "", sep = "```", fmt = fn x => x} toks
+	    val atm   = A.mk_new_term A.ATOMS_ATOMS hdr [r] []
+	    val reg   = R.consReg COLONleft COLONright
+	in A.mk_new_term A.DEC_QMSG str (regs @ [reg]) [id, atm, typ]
+	end)
+| msgkind ident COMMA atexp' COLON typ
+    (fn name =>
+	let val iregs1 = R.getRegionList msgkindright identleft
+	    val iregs2 = R.getRegionList identright   COMMAleft
+	    val eregs1 = R.getRegionList COMMAright   atexp'left
+	    val eregs2 = R.getRegionList atexp'right  COLONleft
+	    val tregs  = R.getRegionList COLONright   typleft
+	    val id     = ident  (iregs1 @ iregs2)
+	    val exp    = atexp' (eregs1 @ eregs2)
+	    val typ    = typ    tregs
+	    val reg1   = R.consReg COMMAleft COMMAright
+	    val reg2   = R.consReg COLONleft COLONright
+	    val (str, regs) = msgkind ()
+	in case A.getAtomExp exp of
+	       SOME atm => A.mk_new_term A.DEC_QMSG  str (regs @ [reg1, reg2]) [id, atm, typ]
+	     | NONE     => A.mk_new_term A.DEC_EQMSG str (regs @ [reg1, reg2]) [id, exp, typ]
+	end)
+| IMPORT idents
+    (fn name =>
+	let val iregs = R.getRegionList IMPORTright identsleft
+	    val ids   = idents iregs
+	    val reg   = R.consReg IMPORTleft IMPORTright
+	in A.mk_new_term A.DEC_IMPORT "" [reg] ids
+	end)
+| IMPORT TYPE tycons
+    (fn name =>
+	let val iregs = R.getRegionList TYPEright tyconsleft
+	    val tcs   = tycons iregs
+	    val reg1  = R.consReg IMPORTleft IMPORTright
+	    val reg2  = R.consReg TYPEleft   TYPEright
+	in A.mk_new_term A.DEC_TIMPORT "" [reg1, reg2] tcs
+	end)
+| EXPORT idents
+    (fn name =>
+	let val ids = idents []
+	    val reg = R.consReg EXPORTleft EXPORTright
+	in A.mk_new_term A.DEC_EXPORT "" [reg] ids
+	end)
+| ASSUME idents
+    (fn name =>
+	let val ids = idents []
+	    val reg = R.consReg ASSUMEleft ASSUMEright
+	in A.mk_new_term A.DEC_ASSUME "" [reg] ids
+	end)
+| GUARANTEE idents
+    (fn name =>
+	let val ids = idents []
+	    val reg = R.consReg GUARANTEEleft GUARANTEEright
+	in A.mk_new_term A.DEC_GUARANT "" [reg] ids
+	end)
+| OPTIONS idents
+    (fn name =>
+	let val ids = idents []
+	    val reg = R.consReg OPTIONSleft OPTIONSright
+	in A.mk_new_term A.DEC_OPTIONS "" [reg] ids
+	end)
+| TYPEOF LPAREN ident RPAREN
+    (fn name =>
+	let val iregs1 = R.getRegionList LPARENright identleft
+	    val iregs2 = R.getRegionList identright RPARENleft
+	    val id     = ident (iregs1 @ iregs2)
+	    val reg1   = R.consReg TYPEOFleft TYPEOFright
+	    val reg2   = R.consReg LPARENleft LPARENright
+	    val reg3   = R.consReg RPARENleft RPARENright
+	in A.mk_new_term A.DEC_TYPEOF "" [reg1, reg2, reg3] [id]
+	end)
+| INFIX d_opt ident
+    (fn name =>
+	let val iregs = R.getRegionList INFIXright identleft
+	    val id    = ident iregs
+	    val reg   = R.consReg INFIXleft INFIXright
+	    val _     = F.addInfixL (A.getIdIdent id) (d_opt ())
+	in A.mk_new_term A.DEC_INFIX "L" [reg] [id]
+	end)
+| INFIXR d_opt ident
+    (fn name =>
+	let val iregs = R.getRegionList INFIXRright identleft
+	    val id    = ident iregs
+	    val reg   = R.consReg INFIXRleft INFIXRright
+	    val _     = F.addInfixR (A.getIdIdent id) (d_opt ())
+	in A.mk_new_term A.DEC_INFIX "R" [reg] [id]
+	end)
+| DOC
+    (fn name =>
+	let val children = map (fn s => A.mk_new_term A.DOC_LINE s [] []) DOC
+	in A.mk_new_term A.DEC_DOC "" [] children
+	end)
+| DATA tycon EQUALOP datacons
+    (fn name =>
+	let val iregs1 = R.getRegionList DATAright    tyconleft
+	    val iregs2 = R.getRegionList tyconright   EQUALOPleft
+	    val dregs  = R.getRegionList EQUALOPright dataconsleft
+	    val id     = tycon (iregs1 @ iregs2)
+	    val (cons, regs) = datacons ()
+	    val reg1   = R.consReg DATAleft DATAright
+	    val reg2   = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_new_term A.DEC_DATA "" [reg1, reg2] (id :: cons)
+	end)
+| VARIABLE identlist COLON typc
+    (fn name =>
+	let val tregs  = R.getRegionList COLONright     typcleft
+	    val iregs1 = R.getRegionList VARIABLEright  identlistleft
+	    val iregs2 = R.getRegionList identlistright VARIABLEleft
+	    val idl    = identlist (iregs1 @ iregs2)
+	    val ty     = typc tregs
+	    val reg1   = R.consReg VARIABLEleft VARIABLEright
+	    val reg2   = R.consReg COLONleft    COLONright
+	in A.mk_new_term A.DEC_VAR "" [reg1, reg2] [idl, ty]
+	end)
+| INCLUDE ident
+    (fn name =>
+	let val id    = ident []
+	    val reg   = R.consReg INCLUDEleft INCLUDEright
+	    val parms = A.mk_new_term A.INCPARMS_P "" [] []
+	in A.mk_new_term A.DEC_INCLUDE "" [reg] [id, parms]
+	end)
+| INCLUDE ident WHERE includeparms
+    (fn name =>
+	let val id    = ident []
+	    val parms = includeparms ()
+	    val reg1  = R.consReg INCLUDEleft INCLUDEright
+	    val reg2  = R.consReg WHEREleft   WHEREright
+	in A.mk_new_term A.DEC_INCLUDE "" [reg1, reg2] [id, parms]
+	end)
+
+dcons :
+  ident OF typ
+    (fn () =>
+	let val iregs = R.getRegionList identright OFleft
+	    val tregs = R.getRegionList OFright    typleft
+	    val id    = ident iregs
+	    val ty    = typ tregs
+	    val reg   = R.consReg OFleft OFright
+	in A.mk_new_term A.DATA_CONS "" [reg] [id, ty]
+	end)
+
+datacons :
+  dcons
+    (fn () =>
+	let val cons = dcons ()
+	in ([cons], [])
+	end)
+| dcons PIPE datacons
+    (fn () =>
+	let val cons = dcons ()
+	    val (conss, regs) = datacons ()
+	    val reg  = R.consReg PIPEleft PIPEright
+	in (cons :: conss, reg :: regs)
+	end)
+
+prop :
+  exp PAND exp
+    (fn parents =>
+	let val pregs1 = R.getRegionList exp1right PANDleft
+	    val pregs2 = R.getRegionList PANDright exp2left
+	    val prop1  = mk_pexp (exp1 pregs1)
+	    val prop2  = mk_pexp (exp2 pregs2)
+	    val reg    = R.consReg PANDleft PANDright
+	in A.mk_new_pterm A.PROP_AND "" [reg] parents [prop1, prop2]
+	end)
+| exp POR exp
+    (fn parents =>
+	let val pregs1 = R.getRegionList exp1right PORleft
+	    val pregs2 = R.getRegionList PORright  exp2left
+	    val prop1  = mk_pexp (exp1 pregs1)
+	    val prop2  = mk_pexp (exp2 pregs2)
+	    val reg    = R.consReg PORleft PORright
+	in A.mk_new_pterm A.PROP_OR "" [reg] parents [prop1, prop2]
+	end)
+| exp FUNARROW exp
+    (fn parents =>
+	let val pregs1 = R.getRegionList exp1right     FUNARROWleft
+	    val pregs2 = R.getRegionList FUNARROWright exp2left
+	    val prop1  = mk_pexp (exp1 pregs1)
+	    val prop2  = mk_pexp (exp2 pregs2)
+	    val reg    = R.consReg FUNARROWleft FUNARROWright
+	in A.mk_new_pterm A.PROP_IMP "" [reg] parents [prop1, prop2]
+	end)
+| exp IFF exp
+    (fn parents =>
+	let val pregs1 = R.getRegionList exp1right IFFleft
+	    val pregs2 = R.getRegionList IFFright  exp2left
+	    val prop1  = mk_pexp (exp1 pregs1)
+	    val prop2  = mk_pexp (exp2 pregs2)
+	    val reg    = R.consReg IFFleft IFFright
+	in A.mk_new_pterm A.PROP_IFF "" [reg] parents [prop1, prop2]
+	end)
+| FORALL identlist COLON typ DOT exp
+    (fn parents =>
+	let val iregs  = R.getRegionList FORALLright identlistleft
+	    val tregs1 = R.getRegionList COLONright  typleft
+	    val tregs2 = R.getRegionList typright    DOTleft
+	    val pregs  = R.getRegionList DOTright    expleft
+	    val seq    = identlist iregs
+	    val typ    = typ (tregs1 @ tregs2)
+	    val prop   = mk_pexp (exp pregs)
+	    val reg1   = R.consReg FORALLleft FORALLright
+	    val reg2   = R.consReg COLONleft  COLONright
+	    val reg3   = R.consReg DOTleft    DOTright
+	in A.mk_new_pterm A.PROP_ALL "" [reg1, reg2, reg3] parents [seq, typ, prop]
+	end)
+| EXISTS identlist COLON typ DOT exp
+    (fn parents =>
+	let val iregs  = R.getRegionList EXISTSright identlistleft
+	    val tregs1 = R.getRegionList COLONright  typleft
+	    val tregs2 = R.getRegionList typright    DOTleft
+	    val pregs  = R.getRegionList DOTright    expleft
+	    val seq    = identlist iregs
+	    val typ    = typ (tregs1 @ tregs2)
+	    val prop   = mk_pexp (exp pregs)
+	    val reg1   = R.consReg EXISTSleft EXISTSright
+	    val reg2   = R.consReg COLONleft  COLONright
+	    val reg3   = R.consReg DOTleft    DOTright
+	in A.mk_new_pterm A.PROP_EX "" [reg1, reg2, reg3] parents [seq, typ, prop]
+	end)
+| atexp' OBSERVES atexp' AT atexp'
+    (fn parents =>
+	let val eregs1 = R.getRegionList atexp'1right  OBSERVESleft
+	    val eregs2 = R.getRegionList OBSERVESright atexp'2left
+	    val eregs3 = R.getRegionList atexp'2right  ATleft
+	    val eregs4 = R.getRegionList ATright       atexp'3left
+	    val exp1   = atexp'1 eregs1
+	    val exp2   = atexp'2 (eregs2 @ eregs3)
+	    val exp3   = atexp'3 eregs4
+	    val reg1   = R.consReg OBSERVESleft OBSERVESright
+	    val reg2   = R.consReg ATleft ATright
+	in A.mk_new_pterm A.PROP_OBS "" [reg1, reg2] parents [exp1, exp2, exp3]
+	end)
+
+eqsep :
+  EQUALOP   (fn () => ())
+| EQEQUALOP (fn () => ())
+
+idpatseq :
+  ident
+    (fn () =>
+	let val id     = ident []
+	    val params = A.mk_new_term A.PARAM_P "" [] []
+	in (id, params)
+	end)
+| ident patseq
+    (fn () =>
+	let val id     = ident []
+	    val args   = patseq ()
+	    val params = A.mk_new_term A.PARAM_P "" [] args
+	in (id, params)
+	end)
+
+invariantdec :
+  INVARIANT ident ON pat IN idpatseq eqsep exp
+    (fn str =>
+	let val iregs1 = R.getRegionList INVARIANTright identleft
+	    val iregs2 = R.getRegionList identright     ONleft
+	    val fregs1 = R.getRegionList ONright        patleft
+	    val fregs2 = R.getRegionList patright       INleft
+	    val pregs  = R.getRegionList eqsepright     expleft
+	    val id     = ident (iregs1 @ iregs2)
+	    val pat    = pat   (fregs1 @ fregs2)
+	    val (cls, params) = idpatseq ()
+	    val prop   = mk_pexp (exp pregs)
+	    val reg1   = R.consReg INVARIANTleft INVARIANTright
+	    val reg2   = R.consReg ONleft        ONright
+	    val reg3   = R.consReg INleft        INright
+	    val reg4   = R.consReg eqsepleft     eqsepright
+	    val regs   = [reg1, reg2, reg3, reg4]
+	    val lst    = [id, cls, params, pat, prop]
+	in A.mk_new_term A.DEC_INV str regs lst
+	end)
+| ORDERING ident ON pat THEN pat IN idpatseq eqsep exp
+    (fn str =>
+	let val iregs1 = R.getRegionList ORDERINGright  identleft
+	    val iregs2 = R.getRegionList identright     ONleft
+	    val fregs1 = R.getRegionList ONright        pat1left
+	    val fregs2 = R.getRegionList pat1right      THENleft
+	    val fregs3 = R.getRegionList THENright      pat2left
+	    val fregs4 = R.getRegionList pat2right      INleft
+	    val pregs  = R.getRegionList eqsepright     expleft
+	    val id     = ident (iregs1 @ iregs2)
+	    val pat1   = pat1  (fregs1 @ fregs2)
+	    val pat2   = pat2  (fregs3 @ fregs4)
+	    val (cls, params) = idpatseq ()
+	    val prop   = mk_pexp (exp pregs)
+	    val reg1   = R.consReg ORDERINGleft  ORDERINGright
+	    val reg2   = R.consReg ONleft        ONright
+	    val reg3   = R.consReg THENleft      THENright
+	    val reg4   = R.consReg INleft        INright
+	    val reg5   = R.consReg eqsepleft     eqsepright
+	    val regs   = [reg1, reg2, reg3, reg4, reg5]
+	    val lst    = [id, cls, params, pat1, pat2, prop]
+	in A.mk_new_term A.DEC_ORDER str regs lst
+	end)
+| PROGRESS ident ON pat THEN pat IN idpatseq WITH ident eqsep exp
+    (fn str =>
+	let val iregs1 = R.getRegionList PROGRESSright  ident1left
+	    val iregs2 = R.getRegionList ident1right    ONleft
+	    val fregs1 = R.getRegionList ONright        pat1left
+	    val fregs2 = R.getRegionList pat1right      THENleft
+	    val fregs3 = R.getRegionList THENright      pat2left
+	    val fregs4 = R.getRegionList pat2right      INleft
+	    val wregs1 = R.getRegionList WITHright      ident2left
+	    val wregs2 = R.getRegionList ident2right    eqsepleft
+	    val pregs  = R.getRegionList eqsepright     expleft
+	    val id     = ident1 (iregs1 @ iregs2)
+	    val pat1   = pat1   (fregs1 @ fregs2)
+	    val pat2   = pat2   (fregs3 @ fregs4)
+	    val (cls, params) = idpatseq ()
+	    val wcls   = ident2 (wregs1 @ wregs2)
+	    val prop   = mk_pexp (exp pregs)
+	    val reg1   = R.consReg PROGRESSleft  PROGRESSright
+	    val reg2   = R.consReg ONleft        ONright
+	    val reg3   = R.consReg THENleft      THENright
+	    val reg4   = R.consReg INleft        INright
+	    val reg5   = R.consReg WITHleft      WITHright
+	    val reg6   = R.consReg eqsepleft     eqsepright
+	    val regs   = [reg1, reg2, reg3, reg4, reg5, reg6]
+	    val lst    = [id, cls, params, pat1, pat2, wcls, prop]
+	in A.mk_new_term A.DEC_PROGRESS str regs lst
+	end)
+| PROGRESS ident ON pat THEN pat IN idpatseq WITH pat IN ident TAND pat FUNARROW exp EQEQUALOP exp
+    (fn str =>
+	let val iregs1 = R.getRegionList PROGRESSright  ident1left
+	    val iregs2 = R.getRegionList ident1right    ONleft
+	    val fregs1 = R.getRegionList ONright        pat1left
+	    val fregs2 = R.getRegionList pat1right      THENleft
+	    val fregs3 = R.getRegionList THENright      pat2left
+	    val fregs4 = R.getRegionList pat2right      IN1left
+	    val aregs1 = R.getRegionList WITHright      pat3left
+	    val aregs2 = R.getRegionList pat3right      IN2left
+	    val wregs1 = R.getRegionList IN2right       ident2left
+	    val wregs2 = R.getRegionList ident2right    TANDleft
+	    val bregs1 = R.getRegionList TANDright      pat4left
+	    val bregs2 = R.getRegionList pat4right      FUNARROWleft
+	    val rregs1 = R.getRegionList FUNARROWright  exp1left
+	    val rregs2 = R.getRegionList exp1right      EQEQUALOPleft
+	    val pregs  = R.getRegionList EQEQUALOPright exp2left
+	    val id     = ident1 (iregs1 @ iregs2)
+	    val pat1   = pat1   (fregs1 @ fregs2)
+	    val pat2   = pat2   (fregs3 @ fregs4)
+	    val (cls, params) = idpatseq ()
+	    val wpat   = pat3   (aregs1 @ aregs2)
+	    val wcls   = ident2 (wregs1 @ wregs2)
+	    val ppat   = pat4   (bregs1 @ bregs2)
+	    val pprop  = mk_pexp (exp1 (rregs1 @ rregs2))
+	    val prop   = mk_pexp (exp2 pregs)
+	    val reg1   = R.consReg PROGRESSleft  PROGRESSright
+	    val reg2   = R.consReg ONleft        ONright
+	    val reg3   = R.consReg THENleft      THENright
+	    val reg4   = R.consReg IN1left       IN1right
+	    val reg5   = R.consReg WITHleft      WITHright
+	    val reg6   = R.consReg IN2left       IN2right
+	    val reg7   = R.consReg TANDleft      TANDright
+	    val reg8   = R.consReg FUNARROWleft  FUNARROWright
+	    val reg9   = R.consReg EQEQUALOPleft EQEQUALOPright
+	    val regs   = [reg1, reg2, reg3, reg4, reg5, reg6, reg7, reg8, reg9]
+	    val lst    = [id, cls, params, pat1, pat2, wpat, wcls, ppat, pprop, prop]
+	in A.mk_new_term A.DEC_STRICT str regs lst
+	end)
+| CONSIST ident ON pat TAND pat IN idpatseq eqsep exp
+    (fn str =>
+	let val iregs1 = R.getRegionList CONSISTright   ident1left
+	    val iregs2 = R.getRegionList identright     ONleft
+	    val fregs1 = R.getRegionList ONright        pat1left
+	    val fregs2 = R.getRegionList pat1right      TANDleft
+	    val fregs3 = R.getRegionList TANDright      pat2left
+	    val fregs4 = R.getRegionList pat2right      INleft
+	    val pregs  = R.getRegionList eqsepright     expleft
+	    val id     = ident (iregs1 @ iregs2)
+	    val pat1   = pat1  (fregs1 @ fregs2)
+	    val pat2   = pat2  (fregs3 @ fregs4)
+	    val (cls, params) = idpatseq ()
+	    val prop   = mk_pexp (exp pregs)
+	    val reg1   = R.consReg CONSISTleft   CONSISTright
+	    val reg2   = R.consReg ONleft        ONright
+	    val reg3   = R.consReg TANDleft      TANDright
+	    val reg4   = R.consReg INleft        INright
+	    val reg5   = R.consReg eqsepleft     eqsepright
+	in A.mk_new_term A.DEC_CONSIST str [reg1, reg2, reg3, reg4, reg5] [id, cls, params, pat1, pat2, prop]
+	end)
+| MEMORY ident ON pat THEN pat IN idpatseq WITH pat IN ident eqsep exp
+    (fn str =>
+	let val iregs1 = R.getRegionList MEMORYright    ident1left
+	    val iregs2 = R.getRegionList ident1right    ONleft
+	    val fregs1 = R.getRegionList ONright        pat1left
+	    val fregs2 = R.getRegionList pat1right      THENleft
+	    val fregs3 = R.getRegionList THENright      pat2left
+	    val fregs4 = R.getRegionList pat2right      IN1left
+	    val aregs1 = R.getRegionList WITHright      pat3left
+	    val aregs2 = R.getRegionList pat3right      IN2left
+	    val wregs1 = R.getRegionList IN2right       ident2left
+	    val wregs2 = R.getRegionList ident2right    eqsepleft
+	    val pregs  = R.getRegionList eqsepright     expleft
+	    val id     = ident1 (iregs1 @ iregs2)
+	    val pat1   = pat1   (fregs1 @ fregs2)
+	    val pat2   = pat2   (fregs3 @ fregs4)
+	    val (cls, params) = idpatseq ()
+	    val wpat   = pat3   (aregs1 @ aregs2)
+	    val wcls   = ident2 (wregs1 @ wregs2)
+	    val prop   = mk_pexp (exp pregs)
+	    val reg1   = R.consReg MEMORYleft    MEMORYright
+	    val reg2   = R.consReg ONleft        ONright
+	    val reg3   = R.consReg THENleft      THENright
+	    val reg4   = R.consReg IN1left       IN1right
+	    val reg5   = R.consReg WITHleft      WITHright
+	    val reg6   = R.consReg IN2left       IN2right
+	    val reg7   = R.consReg eqsepleft     eqsepright
+	    val regs   = [reg1, reg2, reg3, reg4, reg5, reg6, reg7]
+	    val lst    = [id, cls, params, pat1, pat2, wpat, wcls, prop]
+	in A.mk_new_term A.DEC_MEMORY str regs lst
+	end)
+
+paramdec :
+  PARAM ident COLON typc
+    (fn () =>
+	let val tregs  = R.getRegionList COLONright typcleft
+	    val ty     = typc tregs
+	    val reg1   = R.consReg PARAMleft PARAMright
+	    val reg2   = R.consReg COLONleft COLONright
+	in if A.typeIsType ty
+	   then let val sreg  = R.consReg (R.downPos identleft) (R.downPos identright)
+		    val tvseq = A.mk_new_term A.TYPEVARSEQ_EM "" [sreg] []
+		    val id    = ident []
+		    val tycon = A.vid2tycon id
+		    val reg3  = R.consReg typcleft typcright
+		in A.mk_new_term A.DEC_TYPARAM "" [reg1, reg2, reg3] [tvseq, tycon, ty]
+		end
+	   else let val iregs1 = R.getRegionList PARAMright identleft
+		    val iregs2 = R.getRegionList identright COLONleft
+		    val id     = ident (iregs1 @ iregs2)
+		in A.mk_new_term A.DEC_PARAM "" [reg1, reg2] [id, ty]
+		end
+	end)
+| PARAM ident COLON typc PIPE atexp'
+    (fn () =>
+	let val tregs1 = R.getRegionList COLONright typcleft
+	    val tregs2 = R.getRegionList typcright  PIPEleft
+	    val eregs  = R.getRegionList PIPEright  atexp'left
+	    val ty     = typc (tregs1 @ tregs2)
+	    val prop   = atexp' eregs
+	    val reg1   = R.consReg PARAMleft PARAMright
+	    val reg2   = R.consReg COLONleft COLONright
+	    val reg3   = R.consReg PIPEleft  PIPEright
+	    val regs   = [reg1, reg2, reg3]
+	in if A.typeIsType ty
+	   then let val sreg  = R.consReg (R.downPos identleft) (R.downPos identright)
+		    val tvseq = A.mk_new_term A.TYPEVARSEQ_EM "" [sreg] []
+		    val id    = ident []
+		    val tycon = A.vid2tycon id
+		    val reg4  = R.consReg typcleft typcright
+		in A.mk_new_term A.DEC_TYPARAMP "" (regs @ [reg4]) [tvseq, tycon, ty, prop]
+		end
+	   else let val iregs1 = R.getRegionList PARAMright identleft
+		    val iregs2 = R.getRegionList identright COLONleft
+		    val id     = ident (iregs1 @ iregs2)
+		in A.mk_new_term A.DEC_PARAMP "" regs [id, ty, prop]
+		end
+	end)
+| PARAM typevarseq tycon COLON typc
+    (fn () =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val tvseq = typevarseq ()
+	    val tycon = tycon []
+	    val typ   = typc tregs
+	    val reg1  = R.consReg PARAMleft PARAMright
+	    val reg2  = R.consReg COLONleft COLONright
+	in A.mk_new_term A.DEC_TYPARAM "" [reg1, reg2] [tvseq, tycon, typ]
+	end)
+| PARAM tycon COMMA ident COLON typc
+    (fn () =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val sreg  = R.consReg (R.downPos tyconleft) (R.downPos tyconleft)
+	    val tvseq = A.mk_new_term A.TYPEVARSEQ_EM "" [sreg] []
+	    val tycon = tycon []
+	    val id    = ident []
+	    val typ   = typc tregs
+	    val reg1  = R.consReg PARAMleft PARAMright
+	    val reg2  = R.consReg COMMAleft COMMAright
+	    val reg3  = R.consReg COLONleft COLONright
+	in A.mk_new_term A.DEC_ETPARAM "" [reg1, reg2, reg3] [tvseq, tycon, id, typ]
+	end)
+| PARAM typevarseq tycon COMMA ident COLON typc
+    (fn () =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val tvseq = typevarseq ()
+	    val tycon = tycon []
+	    val id    = ident []
+	    val typ   = typc tregs
+	    val reg1  = R.consReg PARAMleft PARAMright
+	    val reg2  = R.consReg COMMAleft COMMAright
+	    val reg3  = R.consReg COLONleft COLONright
+	in A.mk_new_term A.DEC_ETPARAM "" [reg1, reg2, reg3] [tvseq, tycon, id, typ]
+	end)
+| SET ident COLON typc
+    (fn () =>
+	let val iregs1 = R.getRegionList SETright identleft
+	    val iregs2 = R.getRegionList identright COLONleft
+	    val tregs  = R.getRegionList COLONright typcleft
+	    val id     = ident (iregs1 @ iregs2)
+	    val ty     = typc tregs
+	    val reg1   = R.consReg SETleft SETright
+	    val reg2   = R.consReg COLONleft COLONright
+	in A.mk_new_term A.DEC_PSET "" [reg1, reg2] [id, ty]
+	end)
+| MAP ident COLON typc COMMA typc
+    (fn () =>
+	let val iregs1 = R.getRegionList MAPright identleft
+	    val iregs2 = R.getRegionList identright COLONleft
+	    val tregs1 = R.getRegionList COLONright typc1left
+	    val tregs2 = R.getRegionList typc1right COMMAleft
+	    val tregs3 = R.getRegionList COMMAright typc2left
+	    val id     = ident (iregs1 @ iregs2)
+	    val ty1    = typc1 (tregs1 @ tregs2)
+	    val ty2    = typc2 tregs3
+	    val reg1   = R.consReg MAPleft MAPright
+	    val reg2   = R.consReg COLONleft COLONright
+	    val reg3   = R.consReg COMMAleft COMMAright
+	in A.mk_new_term A.DEC_PMAP "" [reg1, reg2, reg3] [id, ty1, ty2]
+	end)
+
+
+consdec :
+  CONS ident COLON typc
+    (fn () =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val ty    = typc tregs
+	    val reg1  = R.consReg CONSleft CONSright
+	    val reg2  = R.consReg COLONleft COLONright
+	in if A.typeIsType ty
+	   then let val sreg  = R.consReg (R.downPos identleft) (R.downPos identright)
+		    val tvseq = A.mk_new_term A.TYPEVARSEQ_EM "" [sreg] []
+		    val ident = ident []
+		    val tycon = A.vid2tycon ident
+		    val reg3  = R.consReg typcleft typcright
+		in A.mk_new_term A.DEC_TYCON "" [reg1, reg2, reg3] [tvseq, tycon, ty]
+		end
+	   else let val iregs = R.getRegionList CONSright identleft
+		    val id    = ident iregs
+		    val args  = A.mk_new_term A.ARGS_EM "" [] []
+		in A.mk_new_term A.DEC_CONS "" [reg1, reg2] [id, args, ty]
+		end
+	end)
+| CONS ident args COLON typc
+    (fn () =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val iregs = R.getRegionList CONSright identleft
+	    val id    = ident iregs
+	    val args  = args ()
+	    val ty    = typc tregs
+	    val reg1  = R.consReg CONSleft CONSright
+	    val reg2  = R.consReg COLONleft COLONright
+	in A.mk_new_term A.DEC_CONS "" [reg1, reg2] [id, args, ty]
+	end)
+| CONS ident args COLON typc WITH typevarseq IN typeseqset
+    (fn () =>
+	let val tregs1 = R.getRegionList COLONright typcleft
+	    val tregs2 = R.getRegionList typcright  WITHleft
+	    val iregs  = R.getRegionList CONSright  identleft
+	    val id     = ident iregs
+	    val args   = args ()
+	    val ty     = typc (tregs1 @ tregs2)
+	    val tv     = typevarseq ()
+	    val ts     = typeseqset ()
+	    val reg1   = R.consReg CONSleft  CONSright
+	    val reg2   = R.consReg COLONleft COLONright
+	    val reg3   = R.consReg WITHleft  WITHright
+	    val reg4   = R.consReg INleft    INright
+	in A.mk_new_term A.DEC_OCONS "" [reg1, reg2, reg3, reg4] [id, args, ty, tv, ts]
+	end)
+| CONS ident COLON typc WITH typevarseq IN typeseqset
+    (fn () =>
+	let val tregs1 = R.getRegionList COLONright typcleft
+	    val tregs2 = R.getRegionList typcright  WITHleft
+	    val iregs  = R.getRegionList CONSright  identleft
+	    val id     = ident iregs
+	    val args   = A.mk_new_term A.ARGS_EM "" [] []
+	    val ty     = typc (tregs1 @ tregs2)
+	    val tv     = typevarseq ()
+	    val ts     = typeseqset ()
+	    val reg1   = R.consReg CONSleft  CONSright
+	    val reg2   = R.consReg COLONleft COLONright
+	    val reg3   = R.consReg WITHleft  WITHright
+	    val reg4   = R.consReg INleft    INright
+	in A.mk_new_term A.DEC_OCONS "" [reg1, reg2, reg3, reg4] [id, args, ty, tv, ts]
+	end)
+| CONS typevarseq tycon COLON typc
+    (fn () =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val tvseq = typevarseq ()
+	    val tycon = tycon []
+	    val typ   = typc tregs
+	    val reg1  = R.consReg CONSleft CONSright
+	    val reg2  = R.consReg COLONleft COLONright
+	in A.mk_new_term A.DEC_TYCON "" [reg1, reg2] [tvseq, tycon, typ]
+	end)
+| CONS tycon COMMA ident COLON typc
+    (fn () =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val sreg  = R.consReg (R.downPos tyconleft) (R.downPos tyconleft)
+	    val tvseq = A.mk_new_term A.TYPEVARSEQ_EM "" [sreg] []
+	    val tycon = tycon []
+	    val id    = ident []
+	    val typ   = typc tregs
+	    val reg1  = R.consReg CONSleft CONSright
+	    val reg2  = R.consReg COMMAleft COMMAright
+	    val reg3  = R.consReg COLONleft COLONright
+	in A.mk_new_term A.DEC_EQTYCON "" [reg1, reg2, reg3] [tvseq, tycon, id, typ]
+	end)
+| CONS typevarseq tycon COMMA ident COLON typc
+    (fn () =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val tvseq = typevarseq ()
+	    val tycon = tycon []
+	    val id    = ident []
+	    val typ   = typc tregs
+	    val reg1  = R.consReg CONSleft  CONSright
+	    val reg2  = R.consReg COMMAleft COMMAright
+	    val reg3  = R.consReg COLONleft COLONright
+	in A.mk_new_term A.DEC_EQTYCON "" [reg1, reg2, reg3] [tvseq, tycon, id, typ]
+	end)
+
+patseq :
+  atpat''
+    (fn () =>
+	let val atpat = atpat'' []
+	in [atpat]
+	end)
+| atpat'' patseq
+    (fn () =>
+	let val atpat = atpat'' []
+	    val pats  = patseq ()
+	in atpat :: pats
+	end)
+
+bind :
+  ident patseq EQUALOP exp
+    (fn () =>
+	let val eregs  = R.getRegionList EQUALOPright expleft
+	    val id     = ident []
+	    val pats   = patseq ()
+	    val exp    = exp eregs
+	    val reg    = R.consReg EQUALOPleft EQUALOPright
+	    val params = A.mk_new_term A.PARAM_P "" [] pats
+	in A.mk_new_term A.BIND_DEC "" [reg] [id, params, exp]
+	end)
+| ident patseq COLON typc EQUALOP exp
+    (fn () =>
+	let val eregs  = R.getRegionList EQUALOPright expleft
+	    val tregs1 = R.getRegionList COLONright   typcleft
+	    val tregs2 = R.getRegionList typcright    EQUALOPleft
+	    val id     = ident []
+	    val pats   = patseq ()
+	    val typ    = typc (tregs1 @ tregs2)
+	    val exp    = exp eregs
+	    val reg    = R.consReg EQUALOPleft EQUALOPright
+	    val params = A.mk_new_term A.PARAM_P "" [] pats
+	in A.mk_new_term A.BIND_TDEC "" [reg] [id, params, typ, exp]
+	end)
+| atpat' EQUALOP exp
+    (fn () =>
+	let val eregs = R.getRegionList EQUALOPright expleft
+	    val pregs = R.getRegionList atpat'right EQUALOPleft
+	    val atpat = atpat' pregs
+	    val exp   = exp eregs
+	    val pat   = A.mk_new_term A.PAT_ATPAT "" [] [atpat]
+	    val reg   = R.consReg EQUALOPleft EQUALOPright
+	in case A.getIdVidPat pat of
+	       NONE => A.mk_new_internal_term A.BIND_PAT [reg] [pat, exp]
+	     | SOME id =>
+	       let val params = A.mk_new_term A.PARAM_P "" [] []
+	       in A.mk_new_term A.BIND_DEC "" [reg] [id, params, exp]
+	       end
+	end)
+| atpat' COLON typc EQUALOP exp
+    (fn () =>
+	let val eregs  = R.getRegionList EQUALOPright expleft
+	    val pregs  = R.getRegionList atpat'right  EQUALOPleft
+	    val tregs1 = R.getRegionList COLONright   typcleft
+	    val tregs2 = R.getRegionList typcright    EQUALOPleft
+	    val atpat  = atpat' pregs
+	    val typ    = typc tregs1
+	    val exp    = exp eregs
+	    val pat1   = A.mk_new_term A.PAT_ATPAT "" [] [atpat]
+	    val reg    = R.consReg EQUALOPleft EQUALOPright
+	in case A.getIdVidPat pat1 of
+	       NONE =>
+	       let val pat2 = A.mk_new_pterm A.PAT_TYPED "" [] tregs2 [pat1, typ]
+	       in A.mk_new_internal_term A.BIND_PAT [reg] [pat2, exp]
+	       end
+	     | SOME id =>
+	     let val params = A.mk_new_term A.PARAM_P "" [] []
+	     in A.mk_new_term A.BIND_TDEC "" [reg] [id, params, typ, exp]
+	     end
+	end)
+| INFIX d_opt ident atpat' atpat' EQUALOP exp
+    (fn () =>
+	let val eregs  = R.getRegionList EQUALOPright expleft
+	    val iregs  = R.getRegionList identright   atpat'1left
+	    val pregs1 = R.getRegionList atpat'1right atpat'2left
+	    val pregs2 = R.getRegionList atpat'2right EQUALOPleft
+	    val id     = ident iregs
+	    val arg1   = atpat'1 pregs1
+	    val arg2   = atpat'2 pregs2
+	    val exp    = exp eregs
+	    val reg1   = R.consReg INFIXleft   INFIXright
+	    val reg2   = R.consReg EQUALOPleft EQUALOPright
+	    val regs   = [reg1, reg2]
+	    val _      = F.addInfixL (A.getIdIdent id) (d_opt ())
+	in A.mk_new_term A.BIND_IOP "L" regs [id, arg1, arg2, exp]
+	end)
+| INFIX d_opt ident atpat' atpat' COLON typc EQUALOP exp
+    (fn () =>
+	let val eregs  = R.getRegionList EQUALOPright expleft
+	    val iregs  = R.getRegionList identright   atpat'1left
+	    val pregs1 = R.getRegionList atpat'1right atpat'2left
+	    val pregs2 = R.getRegionList atpat'2right COLONleft
+	    val tregs1 = R.getRegionList COLONright   typcleft
+	    val tregs2 = R.getRegionList typcright    EQUALOPleft
+	    val id     = ident iregs
+	    val arg1   = atpat'1 pregs1
+	    val arg2   = atpat'2 pregs2
+	    val typ    = typc (tregs1 @ tregs2)
+	    val exp    = exp eregs
+	    val reg1   = R.consReg INFIXleft   INFIXright
+	    val reg2   = R.consReg COLONleft   COLONright
+	    val reg3   = R.consReg EQUALOPleft EQUALOPright
+	    val regs   = [reg1, reg2, reg3]
+	    val _      = F.addInfixL (A.getIdIdent id) (d_opt ())
+	in A.mk_new_term A.BIND_TIOP "L" regs [id, arg1, arg2, typ, exp]
+	end)
+| INFIXR d_opt ident atpat' atpat' EQUALOP exp
+    (fn () =>
+	let val eregs  = R.getRegionList EQUALOPright expleft
+	    val iregs  = R.getRegionList identright   atpat'1left
+	    val pregs1 = R.getRegionList atpat'1right atpat'2left
+	    val pregs2 = R.getRegionList atpat'2right EQUALOPleft
+	    val id     = ident iregs
+	    val arg1   = atpat'1 pregs1
+	    val arg2   = atpat'2 pregs2
+	    val exp    = exp eregs
+	    val reg1   = R.consReg INFIXRleft  INFIXRright
+	    val reg2   = R.consReg EQUALOPleft EQUALOPright
+	    val regs   = [reg1, reg2]
+	    val _      = F.addInfixR (A.getIdIdent id) (d_opt ())
+	in A.mk_new_term A.BIND_IOP "R" regs [id, arg1, arg2, exp]
+	end)
+| INFIXR d_opt ident atpat' atpat' COLON typc EQUALOP exp
+    (fn () =>
+	let val eregs  = R.getRegionList EQUALOPright expleft
+	    val iregs  = R.getRegionList identright   atpat'1left
+	    val pregs1 = R.getRegionList atpat'1right atpat'2left
+	    val pregs2 = R.getRegionList atpat'2right COLONleft
+	    val tregs1 = R.getRegionList COLONright   typcleft
+	    val tregs2 = R.getRegionList typcright    EQUALOPleft
+	    val id     = ident iregs
+	    val arg1   = atpat'1 pregs1
+	    val arg2   = atpat'2 pregs2
+	    val typ    = typc (tregs1 @ tregs2)
+	    val exp    = exp eregs
+	    val reg1   = R.consReg INFIXRleft  INFIXRright
+	    val reg2   = R.consReg COLONleft   COLONright
+	    val reg3   = R.consReg EQUALOPleft EQUALOPright
+	    val regs   = [reg1, reg2, reg3]
+	    val _      = F.addInfixR (A.getIdIdent id) (d_opt ())
+	in A.mk_new_term A.BIND_TIOP "R" regs [id, arg1, arg2, typ, exp]
+	end)
+
+scon :
+  NUM
+    (fn parents =>
+	let val reg = R.consReg NUMleft NUMright
+	in A.mk_new_pterm A.SCON_INT NUM [reg] parents []
+	end)
+| INT
+    (fn parents =>
+	let val reg = R.consReg INTleft INTright
+	in A.mk_new_pterm A.SCON_INT INT [reg] parents []
+	end)
+| REAL
+    (fn parents =>
+	let val reg = R.consReg REALleft REALright
+	in A.mk_new_pterm A.SCON_REAL REAL [reg] parents []
+	end)
+| ATOM
+    (fn parents =>
+	let val reg = R.consReg ATOMleft ATOMright
+	in if String.size ATOM = 0
+	   then raise PD.ParseError ("Empty atoms are not allowed", [reg])
+	   else A.mk_new_pterm A.SCON_ATOM ATOM [reg] parents []
+	end)
+| STRING
+    (fn parents =>
+	let val reg = R.consReg STRINGleft STRINGright
+	in A.mk_new_pterm A.SCON_STRING STRING [reg] parents []
+	end)
+| ATOMS
+    (fn parents =>
+	let val reg  = R.consReg ATOMSleft ATOMSright
+	in A.mk_new_pterm A.SCON_ATOMS ATOMS [reg] parents []
+	end)
+
+idents :
+  identidid
+    (fn parents => [identidid []])
+| identidid idents
+    (fn parents =>
+	let val id  = identidid []
+	    val ids = idents    []
+	in id :: ids
+	end)
+
+identlist :
+  idents
+    (fn parents =>
+	let val ids = idents parents
+	in A.mk_new_pterm A.IDENTS_LIST "" [] [] ids
+	end)
+
+ident :
+  identid (identid)
+| identop (identop)
+
+identidid :
+  ID
+    (fn parents =>
+	let val reg = R.consReg IDleft IDright
+	in A.mk_new_pterm A.ID_VID ID [reg] parents []
+	end)
+
+identid :
+  identidid
+    (identidid)
+| MAP
+    (fn parents =>
+	let val reg = R.consReg MAPleft MAPright
+	in A.mk_new_pterm A.ID_VID "map" [reg] parents []
+	end)
+| SET
+    (fn parents =>
+	let val reg = R.consReg SETleft SETright
+	in A.mk_new_pterm A.ID_VID "set" [reg] parents []
+	end)
+| INTERNAL
+    (fn parents =>
+	let val reg = R.consReg INTERNALleft INTERNALright
+	in A.mk_new_pterm A.ID_VID "internal" [reg] parents []
+	end)
+| OUTPUT
+    (fn parents =>
+	let val reg = R.consReg OUTPUTleft OUTPUTright
+	in A.mk_new_pterm A.ID_VID "output" [reg] parents []
+	end)
+| INPUT
+    (fn parents =>
+	let val reg = R.consReg INPUTleft INPUTright
+	in A.mk_new_pterm A.ID_VID "input" [reg] parents []
+	end)
+
+identop :
+  identeq
+    (identeq)
+| STAR
+    (fn parents =>
+	let val reg = R.consReg STARleft STARright
+	in A.mk_new_pterm A.ID_VID "*" [reg] parents []
+	end)
+| PLUS
+    (fn parents =>
+	let val reg = R.consReg PLUSleft PLUSright
+	in A.mk_new_pterm A.ID_VID "+" [reg] parents []
+	end)
+| DOT (fn parents =>
+	let val reg = R.consReg DOTleft DOTright
+	in A.mk_new_pterm A.ID_VID "." [reg] parents []
+	end)
+
+identeq :
+  EQUALOP
+    (fn parents =>
+	let val reg = R.consReg EQUALOPleft EQUALOPright
+	in A.mk_new_pterm A.ID_VID "=" [reg] parents []
+	end)
+
+typevar :
+  tyvar
+    (fn () =>
+	let val tv = tyvar ()
+	in A.mk_new_term A.TYPEVAR_VAR "" [] [tv]
+	end)
+
+tyvar :
+  TYPEVAR
+    (fn () =>
+	let val reg = R.consReg TYPEVARleft TYPEVARright
+	in A.mk_new_term A.ID_TYVAR TYPEVAR [reg] []
+	end)
+
+tycon :
+  ID
+    (fn parents =>
+	let val reg = R.consReg IDleft IDright
+	in A.mk_new_pterm A.ID_TYCON ID [reg] parents []
+	end)
+
+tycons :
+  tycon
+    (fn parents => [tycon []])
+| tycon tycons
+    (fn parents =>
+	let val tc  = tycon  []
+	    val tcs = tycons []
+	in tc :: tcs
+	end)
+
+(*| TYPETYPE
+    (fn parents =>
+	let val reg = R.consReg TYPETYPEleft TYPETYPEright
+	in A.mk_new_pterm A.ID_TYCON "Type" [reg] parents []
+	end)*)
+
+atexptuple :
+  exp COMMA exp
+    (fn () =>
+	let val eregs1 = R.getRegionList exp1right COMMAleft
+	    val eregs2 = R.getRegionList COMMAright exp2left
+	    val exp1   = exp1 eregs1
+	    val exp2   = exp2 eregs2
+	    val reg    = R.consReg COMMAleft COMMAleft
+	in ([exp1, exp2], [reg])
+	end)
+| exp COMMA atexptuple
+    (fn () =>
+	let val eregs = R.getRegionList expright COMMAleft
+	    val exp   = exp eregs
+	    val reg   = R.consReg COMMAleft COMMAleft
+	    val (exps, regs) = atexptuple ()
+	in (exp :: exps, reg :: regs)
+	end)
+
+explist :
+    (fn () => ([], []))
+| neexplist (neexplist)
+
+neexplist :
+  exp
+    (fn () =>
+	let val exp = exp []
+	in ([exp], [])
+	end)
+| exp SEMICOLON neexplist
+    (fn () =>
+	let val eregs = R.getRegionList expright SEMICOLONleft
+	    val exp   = exp eregs
+	    val reg   = R.consReg SEMICOLONleft SEMICOLONleft
+	    val (exps, regs) = neexplist ()
+	in (exp :: exps, reg :: regs)
+	end)
+
+atexp' :
+  atexp
+    (atexp)
+| identid
+    (fn parents =>
+	let val id = identid []
+	in A.mk_new_pterm A.ATEXP_ID "" [] parents [id]
+	end)
+
+expcomp :
+    (fn parents => ([], NONE, [], false))
+| exp
+    (fn parents =>
+	let val exp    = exp []
+	    val bprior = false
+	in ([exp], NONE, [], bprior)
+	end)
+| PRIOR LPAREN SELF RPAREN
+    (fn parents =>
+	let val reg1   = R.consReg PRIORleft PRIORright
+	    val reg2   = R.consReg LPARENleft LPARENright
+	    val reg3   = R.consReg SELFleft SELFright
+	    val reg4   = R.consReg RPARENleft RPARENright
+	    val bprior = true
+	in ([], NONE, [reg1, reg2, reg3, reg4], bprior)
+	end)
+| PRIOR LPAREN SELF RPAREN CLASSOPT exp
+    (fn parents =>
+	let val aregs  = R.getRegionList CLASSOPTright expleft
+	    val reg1   = R.consReg PRIORleft    PRIORright
+	    val reg2   = R.consReg LPARENleft   LPARENright
+	    val reg3   = R.consReg SELFleft     SELFright
+	    val reg4   = R.consReg RPARENleft   RPARENright
+	    val reg5   = R.consReg CLASSOPTleft CLASSOPTright
+	    val exp    = exp aregs
+	    val bprior = true
+	in ([], SOME exp, [reg1, reg2, reg3, reg4], bprior)
+	end)
+| exp COMMA expcomp
+    (fn parents =>
+	let val aregs = R.getRegionList expright   COMMAleft
+	    val eregs = R.getRegionList COMMAright expcompleft
+	    val exp   = exp aregs
+	    val reg   = R.consReg COMMAleft COMMAright
+	    val (exps, opt, regs, bprior) = expcomp eregs
+	in (exp :: exps, opt, reg :: regs, bprior)
+	end)
+
+compsep :
+  COMP
+    (fn () => (R.consReg COMPleft COMPright, "FC"))
+| CLSCOMP
+    (fn () => (R.consReg CLSCOMPleft CLSCOMPright, "L"))
+| BIGCOMP
+    (fn () => (R.consReg BIGCOMPleft BIGCOMPright, ""))
+
+atexp :
+  scon
+    (fn parents =>
+	let val sc = scon []
+	in A.mk_new_pterm A.ATEXP_SCON "" [] parents [sc]
+	end)
+| OP ident
+    (fn parents =>
+	let val iregs = R.getRegionList OPright identleft
+	    val id    = ident iregs
+	    val reg   = R.consReg OPleft OPright
+	in A.mk_new_pterm A.ATEXP_ID "" [reg] parents [id]
+	end)
+| DCOLON spconsty
+    (fn parents =>
+	let val tregs = R.getRegionList DCOLONright spconstyleft
+	    val typ   = spconsty tregs
+	    val reg   = R.consReg DCOLONleft DCOLONright
+	in A.mk_new_pterm A.ATEXP_TYPE "" [reg] parents [typ]
+	end)
+| LPAREN RPAREN
+    (fn parents =>
+	let val reg = R.consReg LPARENleft RPARENright
+	in A.mk_new_pterm A.ATEXP_TUPLE "" [reg] parents []
+	end)
+| LPAREN atexptuple RPAREN
+    (fn parents =>
+	let val (exps, regs) = atexptuple ()
+	    val reg1 = R.consReg LPARENleft LPARENleft
+	    val reg2 = R.consReg RPARENleft RPARENleft
+	in A.mk_new_pterm A.ATEXP_TUPLE "" ([reg1] @ regs @ [reg2]) parents exps
+	end)
+| LPAREN exp RPAREN
+    (fn parents =>
+	let val eregs1 = R.getRegionList LPARENright expleft
+	    val eregs2 = R.getRegionList expright RPARENleft
+	    val exp    = exp (eregs1 @ eregs2)
+	    val reg1   = R.consReg LPARENleft LPARENleft
+	    val reg2   = R.consReg RPARENleft RPARENleft
+	in A.mk_new_pterm A.ATEXP_PAREN "" [reg1, reg2] parents [exp]
+	end)
+| LLIST explist RLIST
+    (fn parents =>
+	let val (exps, regs) = explist ()
+	    val reg1 = R.consReg LLISTleft LLISTright
+	    val reg2 = R.consReg RLISTleft RLISTright
+	in A.mk_new_pterm A.ATEXP_LIST "" ([reg1] @ regs @ [reg2]) parents exps
+	end)
+| LBRACE explist RBRACE
+    (fn parents =>
+	let val (exps, regs) = explist ()
+	    val reg1 = R.consReg LBRACEleft LBRACEright
+	    val reg2 = R.consReg RBRACEleft RBRACEright
+	in A.mk_new_pterm A.ATEXP_BAG "" ([reg1] @ regs @ [reg2]) parents exps
+	end)
+| PRIOR LPAREN exp RPAREN
+    (fn parents =>
+	let val eregs1 = R.getRegionList LPARENright expleft
+	    val eregs2 = R.getRegionList expright RPARENleft
+	    val exp    = exp (eregs1 @ eregs2)
+	    val reg1   = R.consReg PRIORleft PRIORright
+	    val reg2   = R.consReg LPARENleft LPARENright
+	    val reg3   = R.consReg RPARENleft RPARENright
+	in A.mk_new_pterm A.ATEXP_PRIOR "" [reg1, reg2, reg3] parents [exp]
+	end)
+| ANY LPAREN exp RPAREN
+    (fn parents =>
+	let val eregs1 = R.getRegionList LPARENright expleft
+	    val eregs2 = R.getRegionList expright RPARENleft
+	    val exp    = exp (eregs1 @ eregs2)
+	    val reg1   = R.consReg ANYleft ANYright
+	    val reg2   = R.consReg LPARENleft LPARENright
+	    val reg3   = R.consReg RPARENleft RPARENright
+	in A.mk_new_pterm A.ATEXP_ANY "" [reg1, reg2, reg3] parents [exp]
+	end)
+| MSG LPAREN atoms COMMA exp RPAREN
+    (fn parents =>
+	let val eregs1 = R.getRegionList COMMAright expleft
+	    val eregs2 = R.getRegionList expright RPARENleft
+	    val atoms  = atoms ()
+	    val exp    = exp (eregs1 @ eregs2)
+	    val reg1   = R.consReg MSGleft MSGright
+	    val reg2   = R.consReg LPARENleft LPARENright
+	    val reg3   = R.consReg COMMAleft  COMMAright
+	    val reg4   = R.consReg RPARENleft RPARENright
+	in A.mk_new_pterm A.ATEXP_MSG "" [reg1, reg2, reg3, reg4] parents [atoms, exp]
+	end)
+| ONCE LPAREN exp RPAREN
+    (fn parents =>
+	let val eregs1 = R.getRegionList LPARENright expleft
+	    val eregs2 = R.getRegionList expright RPARENleft
+	    val exp    = exp (eregs1 @ eregs2)
+	    val reg1   = R.consReg ONCEleft   ONCEright
+	    val reg2   = R.consReg LPARENleft LPARENright
+	    val reg3   = R.consReg RPARENleft RPARENright
+	in A.mk_new_pterm A.ATEXP_ONCE "" [reg1, reg2, reg3] parents [exp]
+	end)
+| SENDOC LPAREN exp RPAREN
+    (fn parents =>
+	let val eregs1 = R.getRegionList LPARENright expleft
+	    val eregs2 = R.getRegionList expright RPARENleft
+	    val exp    = exp (eregs1 @ eregs2)
+	    val reg1   = R.consReg SENDOCleft SENDOCright
+	    val reg2   = R.consReg LPARENleft LPARENright
+	    val reg3   = R.consReg RPARENleft RPARENright
+	in A.mk_new_pterm A.ATEXP_SENDOC "" [reg1, reg2, reg3] parents [exp]
+	end)
+| ONLOC LPAREN exp RPAREN
+    (fn parents =>
+	let val eregs1 = R.getRegionList LPARENright expleft
+	    val eregs2 = R.getRegionList expright RPARENleft
+	    val exp    = exp (eregs1 @ eregs2)
+	    val reg1   = R.consReg ONLOCleft  ONLOCright
+	    val reg2   = R.consReg LPARENleft LPARENright
+	    val reg3   = R.consReg RPARENleft RPARENright
+	in A.mk_new_pterm A.ATEXP_ONLOC "" [reg1, reg2, reg3] parents [exp]
+	end)
+| SKIP LPAREN exp RPAREN
+    (fn parents =>
+	let val eregs1 = R.getRegionList LPARENright expleft
+	    val eregs2 = R.getRegionList expright RPARENleft
+	    val exp    = exp (eregs1 @ eregs2)
+	    val reg1   = R.consReg SKIPleft   SKIPright
+	    val reg2   = R.consReg LPARENleft LPARENright
+	    val reg3   = R.consReg RPARENleft RPARENright
+	in A.mk_new_pterm A.ATEXP_SKIP "" [reg1, reg2, reg3] parents [exp]
+	end)
+| STATEC LPAREN atexptuple RPAREN
+    (fn parents =>
+	let val (exps,regs) = atexptuple ()
+	    val reg1 = R.consReg STATECleft STATECright
+	    val reg2 = R.consReg LPARENleft LPARENright
+	    val reg3 = R.consReg RPARENleft RPARENright
+	    val n    = List.length exps
+	    val rs   = [reg1, reg2, reg3] @ regs
+	in if n = 3 orelse n = 5 orelse n = 7 orelse n = 9
+	   then A.mk_new_pterm A.ATEXP_STATEC "" rs parents exps
+	   else raise PD.ParseError ("A state class can only have 3, 5, 7, or 9 arguments", rs)
+	end)
+| MEMORYC LPAREN atexptuple RPAREN
+    (fn parents =>
+	let val (exps,regs) = atexptuple ()
+	    val reg1 = R.consReg MEMORYCleft MEMORYCright
+	    val reg2 = R.consReg LPARENleft LPARENright
+	    val reg3 = R.consReg RPARENleft RPARENright
+	    val n    = List.length exps
+	    val rs   = [reg1, reg2, reg3] @ regs
+	in if n = 3 orelse n = 5 orelse n = 7 orelse n = 9
+	   then A.mk_new_pterm A.ATEXP_MEMORYC "" rs parents exps
+	   else raise PD.ParseError ("A Memory class can only have 3, 5, 7, or 9 arguments", rs)
+	end)
+| SQMINUS atexp
+    (fn parents =>
+	let val eregs = R.getRegionList SQMINUSright atexpleft
+	    val exp   = atexp eregs
+	    val reg   = R.consReg SQMINUSleft SQMINUSright
+	in A.mk_new_pterm A.ATEXP_MINUS "" [reg] parents [exp]
+	end)
+| WAIT LPAREN exp COMMA exp RPAREN
+    (fn parents =>
+	let val eregs1 = R.getRegionList LPARENright exp1left
+	    val eregs2 = R.getRegionList exp1right   COMMAleft
+	    val eregs3 = R.getRegionList COMMAright  exp2left
+	    val eregs4 = R.getRegionList exp2right   RPARENleft
+	    val exp1   = exp1 (eregs1 @ eregs2)
+	    val exp2   = exp2 (eregs3 @ eregs4)
+	    val reg1   = R.consReg WAITleft   WAITright
+	    val reg2   = R.consReg LPARENleft LPARENright
+	    val reg3   = R.consReg COMMAleft  COMMAright
+	    val reg4   = R.consReg RPARENleft RPARENright
+	in A.mk_new_pterm A.ATEXP_WAIT "" [reg1, reg2, reg3, reg4] parents [exp1, exp2]
+	end)
+| NULLCLS
+    (fn parents =>
+	let val reg = R.consReg NULLCLSleft NULLCLSright
+	in A.mk_new_pterm A.ATEXP_NULL "" [reg] parents []
+	end)
+(*| BACKSLASH pat' DOT atexp'
+    (fn parents =>
+	let val eregs  = R.getRegionList DOTright expleft
+	    val pregs1 = R.getRegionList BACKSLASHright pat'left
+	    val pregs2 = R.getRegionList pat'right DOTleft
+	    val pat    = pat' (pregs1 @ pregs2)
+	    val exp    = exp eregs
+	    val reg1   = R.consReg BACKSLASHleft BACKSLASHright
+	    val reg2   = R.consReg DOTleft DOTright
+	in A.mk_new_pterm A.EXP_LAMBDA "" [reg1, reg2] parents [pat, exp]
+	end)*)
+
+appexp :
+  ID
+    ([F.O (ID, R.consReg IDleft IDright)])
+| SET
+    ([F.O ("set", R.consReg SETleft SETright)])
+| MAP
+    ([F.O ("map", R.consReg MAPleft MAPright)])
+| INTERNAL
+    ([F.O ("internal", R.consReg INTERNALleft INTERNALright)])
+| OUTPUT
+    ([F.O ("output", R.consReg OUTPUTleft OUTPUTright)])
+| INPUT
+    ([F.O ("input", R.consReg INPUTleft INPUTright)])
+| EQUALOP
+    ([F.O (A.id_eq, R.consReg EQUALOPleft EQUALOPright)])
+| STAR
+    ([F.O (A.id_int_mult, R.consReg STARleft STARright)])
+| PLUS
+    ([F.O (A.id_int_plus, R.consReg PLUSleft PLUSright)])
+| DOT
+    ([F.O (A.id_list_cons, R.consReg DOTleft DOTright)])
+| AT
+    ([F.O (A.id_class_at, R.consReg ATleft ATright)])
+| APPEND
+    ([F.O (A.id_list_concat, R.consReg APPENDleft APPENDright)])
+| atexp
+    ([F.L (atexp, R.consReg atexpleft atexpright)])
+| ID appexp
+    ((F.O (ID, R.consReg IDleft IDright)) :: appexp)
+| SET appexp
+    ((F.O ("set", R.consReg SETleft SETright)) :: appexp)
+| MAP appexp
+    ((F.O ("map", R.consReg MAPleft MAPright)) :: appexp)
+| INTERNAL appexp
+    ((F.O ("internal", R.consReg INTERNALleft INTERNALright)) :: appexp)
+| OUTPUT appexp
+    ((F.O ("output", R.consReg OUTPUTleft OUTPUTright)) :: appexp)
+| INPUT appexp
+    ((F.O ("input", R.consReg INPUTleft INPUTright)) :: appexp)
+| EQUALOP appexp
+    ((F.O (A.id_eq, R.consReg EQUALOPleft EQUALOPright)) :: appexp)
+| STAR appexp
+    ((F.O (A.id_int_mult, R.consReg STARleft STARright)) :: appexp)
+| PLUS appexp
+    ((F.O (A.id_int_plus, R.consReg PLUSleft PLUSright)) :: appexp)
+| DOT appexp
+    ((F.O (A.id_list_cons, R.consReg DOTleft DOTright)) :: appexp)
+| AT appexp
+    ((F.O (A.id_class_at, R.consReg ATleft ATright)) :: appexp)
+| APPEND appexp
+    ((F.O (A.id_list_concat, R.consReg APPENDleft APPENDright)) :: appexp)
+| CLASSOPT appexp
+    ((F.O (A.id_class_opt, R.consReg CLASSOPTleft CLASSOPTright)) :: appexp)
+| CLASSOPTC appexp
+    ((F.O (A.id_class_opt_c, R.consReg CLASSOPTCleft CLASSOPTCright)) :: appexp)
+| atexp appexp
+    ((F.L (atexp, R.consReg atexpleft atexpright)) :: appexp)
+
+infexp :
+  appexp
+    (fn parents =>
+	let fun cons2 (F.L (exp, _)) parents = exp parents
+	      | cons2 (F.O _) _ = raise EH.Impossible ""
+	      | cons2 (F.N ((st, r), t1, t2)) parents = cons1 (F.N ((st, r), t1, t2)) parents
+
+	    and cons1 (F.L (exp, _)) regs = exp regs
+	      | cons1 (F.O _) _ = raise EH.Impossible ""
+	      | cons1 (F.N ((st, r), t1, t2)) regs =
+		let val regs1 = getRegion (R.getTo (F.getRight t1)) (R.getFrom r)
+		    val regs2 = getRegion (R.getTo r) (R.getFrom (F.getLeft t2))
+		    val e1    = cons2 t1 regs1
+		    val e2    = cons2 t2 regs2
+		in if st = A.id_class_bind
+		   then A.mk_new_pterm A.EXP_MBIND "" [r] regs [e1, e2]
+		   else A.mk_new_pterm A.EXP_OP st [r] regs [e1, e2]
+		end
+
+	    fun toAtExp (F.O (st, reg)) parents =
+		let val id = A.mk_new_term A.ID_VID st [reg] []
+		in (A.mk_new_pterm A.ATEXP_ID "" [] parents [id], reg)
+		end
+	      | toAtExp (F.L (atexp, reg)) parents = (atexp parents, reg)
+	      | toAtExp (F.N _) _ = raise EH.Impossible "there should be no node at this stage yet"
+
+	    fun toApp [] _ = raise EH.Impossible ""
+	      | toApp [atexp] parents =
+		let val (atexp, reg) = atexp []
+		in (A.mk_new_pterm A.EXP_ATEXP "" [] parents [atexp], reg)
+		end
+	      | toApp atexps parents =
+		let val atexpEnd      = List.last atexps
+		    val atexpsBegs    = List.rev (List.tl (List.rev atexps))
+		    val (exp, reg1)   = toApp atexpsBegs []
+		    val (atexp, reg2) = atexpEnd []
+		    val regs          = getRegion (R.getTo reg1) (R.getFrom reg2)
+		    val reg           = R.consReg (R.getFrom reg1) (R.getTo reg2)
+		in (A.mk_new_pterm A.EXP_APP "" regs parents [exp, atexp], reg)
+		end
+
+	    fun toApp' [] = []
+	      | toApp' atexps =
+		let val fst  = List.hd atexps
+		    val lst  = List.last atexps
+		    val reg  = R.consReg (R.getFrom (F.getLeft fst)) (R.getTo (F.getRight lst))
+		    val fexp = fn parents => #1 (toApp (map toAtExp atexps) parents)
+		in [F.L (fexp, reg)]
+		end
+
+	    fun convNonOp [] rest = toApp' rest
+	      | convNonOp ((F.O (st, reg)) :: xs) rest =
+		if F.isInfix st
+		then (toApp' rest) @ [F.O (st, reg)] @ (convNonOp xs [])
+		else let val atexp = fn parents =>
+					let val id = A.mk_new_term A.ID_VID st [reg] []
+					in A.mk_new_pterm A.ATEXP_ID "" [] parents [id]
+					end
+		     in convNonOp xs (rest @ [F.L (atexp, reg)])
+		     end
+	      | convNonOp ((F.L (atexp, reg)) :: xs) rest = convNonOp xs (rest @ [F.L (atexp, reg)])
+	      | convNonOp ((F.N _) :: xs) _ = raise EH.Impossible "there should be no node at this stage"
+
+	in cons1 (F.convert (convNonOp appexp [])) parents
+	end handle EH.Impossible st =>
+		   let val reg = R.consReg appexpleft appexpright
+		       val _   = PD.set_parsing_error (st, [reg])
+		   in A.mk_new_term A.DOTS_D "" [reg] []
+		   end)
+
+expbool:
+  exp BAND exp
+    (fn parents =>
+	let val eregs1 = R.getRegionList exp1right BANDleft
+	    val eregs2 = R.getRegionList BANDright exp2left
+	    val exp1   = exp1 eregs1
+	    val exp2   = exp2 eregs2
+	    val reg    = R.consReg BANDleft BANDright
+	in A.mk_new_pterm A.EXP_AND "" [reg] parents [exp1, exp2]
+	end)
+| exp BOR exp
+    (fn parents =>
+	let val eregs1 = R.getRegionList exp1right BORleft
+	    val eregs2 = R.getRegionList BORright exp2left
+	    val exp1   = exp1 eregs1
+	    val exp2   = exp2 eregs2
+	    val reg    = R.consReg BORleft BORright
+	in A.mk_new_pterm A.EXP_OR "" [reg] parents [exp1, exp2]
+	end)
+
+casepat :
+  pat
+    (fn parents =>
+	let val pat = pat []
+	in A.mk_new_pterm A.CASEPAT_PAT "" [] parents [pat]
+	end)
+
+mrule :
+  OF casepat FUNARROW exp
+    (fn () =>
+	let val eregs  = R.getRegionList FUNARROWright expleft
+	    val pregs1 = R.getRegionList OFright       casepatleft
+	    val pregs2 = R.getRegionList casepatright  FUNARROWleft
+	    val pat    = casepat (pregs1 @ pregs2)
+	    val exp    = exp eregs
+	    val reg1   = R.consReg OFleft OFright
+	    val reg2   = R.consReg FUNARROWleft FUNARROWright
+	in A.mk_new_term A.MRULE_M "" [reg1, reg2] [pat, exp]
+	end)
+
+mrules :
+  mrule
+    (fn () =>
+	let val m = mrule ()
+	in [m]
+	end)
+| mrule mrules
+    (fn () =>
+	let val m  = mrule ()
+	    val ms = mrules ()
+	in m :: ms
+	end)
+
+match :
+  mrules
+    (fn () =>
+	let val mrules = mrules ()
+	in A.mk_new_term A.MATCH_M  "" [] mrules
+	end)
+
+exp :
+  infexp
+    (infexp)
+| expbool
+    (expbool)
+| prop
+    (prop)
+(*| COLON typ
+    (fn () =>
+	let val ty = typ ()
+	in A.mk_new_term A.EXP_TYP "" [] [ty]
+	end)*)
+| exp COLON typc
+    (fn parents =>
+	let val eregs = R.getRegionList expright   COLONleft
+	    val tregs = R.getRegionList COLONright typcleft
+	    val exp   = exp eregs
+	    val ty    = typc tregs
+	    val reg   = R.consReg COLONleft COLONright
+	in A.mk_new_pterm A.EXP_TYPED "" [reg] parents [exp, ty]
+	end)
+| BACKSLASH pat' DOT exp
+    (fn parents =>
+	let val eregs  = R.getRegionList DOTright expleft
+	    val pregs1 = R.getRegionList BACKSLASHright pat'left
+	    val pregs2 = R.getRegionList pat'right DOTleft
+	    val pat    = pat' (pregs1 @ pregs2)
+	    val exp    = exp eregs
+	    val reg1   = R.consReg BACKSLASHleft BACKSLASHright
+	    val reg2   = R.consReg DOTleft DOTright
+	in A.mk_new_pterm A.EXP_LAMBDA "" [reg1, reg2] parents [pat, exp]
+	end)
+(*| BACKSLASH ident DOT exp
+    (fn parents =>
+	let val eregs  = R.getRegionList DOTright expleft
+	    val iregs1 = R.getRegionList BACKSLASHright identleft
+	    val iregs2 = R.getRegionList identright DOTleft
+	    val id     = ident (iregs1 @ iregs2)
+	    val exp    = exp eregs
+	    val reg1   = R.consReg BACKSLASHleft BACKSLASHright
+	    val reg2   = R.consReg DOTleft DOTright
+	in A.mk_new_pterm A.EXP_LAMBDA "" [reg1, reg2] parents [id, exp]
+	end)
+| BACKSLASH ident COLON typ DOT exp
+    (fn parents =>
+	let val eregs  = R.getRegionList DOTright expleft
+	    val tregs1 = R.getRegionList COLONright typleft
+	    val tregs2 = R.getRegionList typright DOTleft
+	    val iregs1 = R.getRegionList BACKSLASHright identleft
+	    val iregs2 = R.getRegionList identright COLONleft
+	    val id     = ident (iregs1 @ iregs2)
+	    val ty     = typ (tregs1 @ tregs2)
+	    val exp    = exp eregs
+	    val reg1   = R.consReg BACKSLASHleft BACKSLASHright
+	    val reg2   = R.consReg DOTleft DOTright
+	    val reg3   = R.consReg COLONleft COLONright
+	in A.mk_new_pterm A.EXP_TLAMBDA "" [reg1, reg2, reg3] parents [id, ty, exp]
+	end)*)
+| IF exp THEN exp ELSE exp
+    (fn parents =>
+	let val eregs1 = R.getRegionList IFright exp1left
+	    val eregs2 = R.getRegionList exp1right THENleft
+	    val eregs3 = R.getRegionList THENright exp2left
+	    val eregs4 = R.getRegionList exp2right ELSEleft
+	    val eregs5 = R.getRegionList ELSEright exp3left
+	    val exp1   = exp1 (eregs1 @ eregs2)
+	    val exp2   = exp2 (eregs3 @ eregs4)
+	    val exp3   = exp3 eregs5
+	    val reg1   = R.consReg IFleft IFright
+	    val reg2   = R.consReg THENleft THENright
+	    val reg3   = R.consReg ELSEleft ELSEright
+	in A.mk_new_pterm A.EXP_ITE "" [reg1, reg2, reg3] parents [exp1, exp2, exp3]
+	end)
+| exp SBIND pat SBIND exp
+    (fn parents =>
+	let val eregs1 = R.getRegionList exp1right SBIND1left
+	    val eregs2 = R.getRegionList SBIND2right exp2left
+	    val pregs1 = R.getRegionList SBIND1right patleft
+	    val pregs2 = R.getRegionList patright SBIND2left
+	    val exp1   = exp1 eregs1
+	    val pat    = pat (pregs1 @ pregs2)
+	    val exp2   = exp2 eregs2
+	    val reg1   = R.consReg SBIND1left SBIND1right
+	    val reg2   = R.consReg SBIND2left SBIND2right
+	in A.mk_new_pterm A.EXP_BINDING "" [reg1, reg2] parents [exp1, pat, exp2]
+	end)
+| LET bind IN exp
+    (fn parents =>
+	let val eregs = R.getRegionList INright expleft
+	    val n     = F.newScope ()
+	    val bind  = bind ()
+	    val exp   = exp eregs
+	    val _     = F.rmScope n
+	    val reg1  = R.consReg LETleft LETright
+	    val reg2  = R.consReg INleft  INright
+	in A.mk_new_pterm A.EXP_LET "" [reg1, reg2] parents [bind, exp]
+	end)
+| atexp' WHERE bind
+    (fn parents =>
+	let val eregs = R.getRegionList atexp'right WHEREleft
+	    val n     = F.newScope ()
+	    val bind  = bind ()
+	    val exp   = atexp' eregs
+	    val _     = F.rmScope n
+	    val reg   = R.consReg WHEREleft WHEREright
+	in A.mk_new_pterm A.EXP_WHERE "" [reg] parents [exp, bind]
+	end)
+| LETREC bind IN exp
+    (fn parents =>
+	let val eregs = R.getRegionList INright expleft
+	    val n     = F.newScope ()
+	    val bind  = bind ()
+	    val exp   = exp eregs
+	    val _     = F.rmScope n
+	    val reg1  = R.consReg LETRECleft LETRECright
+	    val reg2  = R.consReg INleft  INright
+	in A.mk_new_pterm A.EXP_LETR "" [reg1, reg2] parents [bind, exp]
+	end)
+| CLASS bind IN exp
+    (fn parents =>
+	let val eregs = R.getRegionList INright expleft
+	    val n     = F.newScope ()
+	    val bind  = bind ()
+	    val exp   = exp eregs
+	    val _     = F.rmScope n
+	    val reg1  = R.consReg CLASSleft CLASSright
+	    val reg2  = R.consReg INleft  INright
+	in A.mk_new_pterm A.EXP_CLASS "" [reg1, reg2] parents [bind, exp]
+	end)
+| exp compsep LPAREN expcomp RPAREN
+    (fn parents =>
+	let val eregs  = R.getRegionList expright     compsepleft
+	    val cregs1 = R.getRegionList LPARENright  expcompleft
+	    val cregs2 = R.getRegionList expcompright RPARENleft
+	    val exp    = exp eregs
+	    val (exps, opt, regs, bprior) = expcomp (cregs1 @ cregs2)
+	    val (reg1, st0) = compsep ()
+	    val reg2   = R.consReg LPARENleft LPARENright
+	    val reg3   = R.consReg RPARENleft RPARENright
+	    val regs'  = [reg1, reg2] @ regs @ [reg3]
+	    val st1    = if bprior then "P" else ""
+	    val atexps = case opt of SOME atexp => [atexp] | _ => []
+	    val st2    = if List.null atexps then "" else "O"
+	    val st     = st1 ^ st2 ^ st0
+	in A.mk_new_pterm A.EXP_COMP st regs' parents (exp :: exps @ atexps)
+	end)
+| exp compsep ident
+    (fn parents =>
+	let val eregs  = R.getRegionList expright compsepleft
+	    val iregs  = R.getRegionList compsepright identleft
+	    val exp    = exp eregs
+	    val icls   = ident iregs
+	    val acls   = A.mk_new_pterm A.ATEXP_ID  "" [] [] [icls]
+	    val cls    = A.mk_new_pterm A.EXP_ATEXP "" [] [] [acls]
+	    val (reg, st) = compsep ()
+	in A.mk_new_pterm A.EXP_COMP st [reg] parents [exp, cls]
+	end)
+| CASE exp match
+    (fn parents =>
+	let val eregs = R.getRegionList CASEright expleft
+	    val exp   = exp eregs
+	    val match = match ()
+	    val reg   = R.consReg CASEleft CASEright
+	in A.mk_new_pterm A.EXP_CASE "" [reg] parents [exp, match]
+	end)
+| atexp' QUOTIENT
+    (fn parents =>
+	let val eregs = R.getRegionList atexp'right QUOTIENTleft
+	    val exp   = atexp' eregs
+	    val reg   = R.consReg QUOTIENTleft QUOTIENTright
+	in A.mk_new_pterm A.EXP_QUOT "" [reg] parents [exp]
+	end)
+
+(*
+| exp MBIND exp
+    (fn parents =>
+	let val eregs1 = R.getRegionList exp1right MBINDleft
+	    val eregs2 = R.getRegionList MBINDright exp2left
+	    val exp1   = exp1 eregs1
+	    val exp2   = exp2 eregs2
+	    val reg    = R.consReg MBINDleft MBINDright
+	in A.mk_new_pterm A.EXP_MBIND "" [reg] parents [exp1, exp2]
+	end)
+*)
+
+(*| exp PIPE exp SEMICOLON exp SEMICOLON exp PIPE
+    (fn () =>
+	let val e1 = exp1 ()
+	    val e2 = exp2 ()
+	    val e3 = exp3 ()
+	    val reg1 = R.consReg PIPE1left PIPE1right
+	    val reg2 = R.consReg SEMICOLONleft SEMICOLONright
+	    val reg3 = R.consReg PIPE2left PIPE2right
+	in A.mk_new_term A.EXP_JOIN "" [reg1, reg2, reg3] [e1, e2, e3]
+	end)
+| exp PIPE exp SEMICOLON exp SEMICOLON exp SEMICOLON PRIOR LPAREN SELF RPAREN PIPE
+    (fn () =>
+	let val e1 = exp1 ()
+	    val e2 = exp2 ()
+	    val e3 = exp3 ()
+	    val reg1 = R.consReg PIPE1left PIPE1right
+	    val reg2 = R.consReg SEMICOLON1left SEMICOLON1right
+	    val reg3 = R.consReg SEMICOLON2left SEMICOLON2right
+	    val reg4 = R.consReg PRIORleft PRIORright
+	    val reg5 = R.consReg LPARENleft LPARENright
+	    val reg6 = R.consReg SELFleft SELFright
+	    val reg7 = R.consReg RPARENleft RPARENright
+	    val reg8 = R.consReg PIPE2left PIPE2right
+	    val regs = [reg1, reg2, reg3, reg4, reg5, reg6, reg7]
+	in A.mk_new_term A.EXP_JOINS "" regs [e1, e2, e3]
+	end)*)
+
+typc :
+  tupty
+    (tupty)
+| tupty TYPEARROW typc
+    (fn parents =>
+	let val tregs1 = R.getRegionList tuptyright TYPEARROWleft
+	    val tregs2 = R.getRegionList TYPEARROWright typcleft
+	    val t1     = tupty tregs1
+	    val t2     = typc tregs2
+	    val reg    = R.consReg TYPEARROWleft TYPEARROWright
+	in A.mk_new_pterm A.TYPE_ARROW "" [reg] parents [t1, t2]
+	end)
+| typc PLUS typc
+    (fn parents =>
+	let val tregs1 = R.getRegionList typc1right PLUSleft
+	    val tregs2 = R.getRegionList PLUSright  typc2left
+	    val t1     = typc1 tregs1
+	    val t2     = typc2 tregs2
+	    val reg    = R.consReg PLUSleft PLUSright
+	in A.mk_new_pterm A.TYPE_DISJU "" [reg] parents [t1, t2]
+	end)
+
+typ :
+  typc
+    (typc)
+| identid COLON consty TYPEARROW typ
+    (fn parents =>
+	let val iregs  = R.getRegionList identidright   COLONleft
+	    val tregs1 = R.getRegionList COLONright     constyleft
+	    val tregs2 = R.getRegionList constyright    TYPEARROWleft
+	    val tregs3 = R.getRegionList TYPEARROWright typleft
+	    val id     = identid iregs
+	    val typ1   = consty  (tregs1 @ tregs2)
+	    val typ2   = typ     tregs3
+	    val reg1   = R.consReg COLONleft     COLONright
+	    val reg2   = R.consReg TYPEARROWleft TYPEARROWright
+	    val regs   = [reg1, reg2]
+	in A.mk_new_pterm A.TYPE_DARROW "" regs parents [id, typ1, typ2]
+	end)
+
+tupty :
+  typetuple
+    (fn parents =>
+	let val (tys, regs) = typetuple []
+	in case tys of
+	       []   => raise EH.Impossible ""
+	     | [ty] => A.updParents ty parents
+	     | _    => A.mk_new_pterm A.TYPE_TUPLE "" regs parents tys
+	end)
+
+typetuple :
+  consty
+    (fn parents =>
+	let val ty = consty parents
+	in ([ty], [])
+	end)
+|  consty STAR typetuple
+    (fn parents =>
+	let val tregs1 = R.getRegionList constyright STARleft
+	    val tregs2 = R.getRegionList STARright typetupleleft
+	    val ty     = consty tregs1
+	    val reg    = R.consReg STARleft STARright
+	    val (tys, regs) = typetuple tregs2
+	in (ty :: tys, reg :: regs)
+	end)
+
+atty :
+  typevar
+    (fn parents =>
+	let val tyvar = typevar ()
+	in A.mk_new_pterm A.TYPE_VAR "" [] parents [tyvar]
+	end)
+| LPAREN typ RPAREN
+    (fn parents =>
+	let val tregs1 = R.getRegionList LPARENright typleft
+	    val tregs2 = R.getRegionList typright RPARENleft
+	    val ty     = typ (tregs1 @ tregs2)
+	    val reg1   = R.consReg LPARENleft LPARENleft
+	    val reg2   = R.consReg RPARENleft RPARENleft
+	in A.mk_new_pterm A.TYPE_PAREN "" [reg1, reg2] parents [ty]
+	end)
+| LBRACE ident COLON typ PIPE prop RBRACE
+    (fn parents =>
+	let val iregs1 = R.getRegionList LBRACEright identleft
+	    val iregs2 = R.getRegionList identright  COLONleft
+	    val tregs1 = R.getRegionList COLONright  typleft
+	    val tregs2 = R.getRegionList typright    PIPEleft
+	    val eregs1 = R.getRegionList PIPEright   propleft
+	    val eregs2 = R.getRegionList propright   RBRACEleft
+	    val id     = ident (iregs1 @ iregs2)
+	    val ty     = typ   (tregs1 @ tregs2)
+	    val prp    = prop  (eregs1 @ eregs2)
+	    val reg1   = R.consReg LBRACEleft LBRACEright
+	    val reg2   = R.consReg COLONleft  COLONright
+	    val reg3   = R.consReg PIPEleft   PIPEright
+	    val reg4   = R.consReg RBRACEleft RBRACEright
+	    val regs   = [reg1, reg2, reg3, reg4]
+	in A.mk_new_pterm A.TYPE_SET "" regs parents [id, ty, prp]
+	end)
+
+(*
+| LBRACE exp RBRACE
+    (fn parents =>
+	let val iregs1 = R.getRegionList LBRACEright expleft
+	    val iregs2 = R.getRegionList expright    RBRACEleft
+	    val exp    = exp (iregs1 @ iregs2)
+	    val reg1   = R.consReg LBRACEleft LBRACEright
+	    val reg2   = R.consReg RBRACEleft RBRACEright
+	    val regs   = [reg1, reg2]
+	in A.mk_new_pterm A.TYPE_SPSET "" regs parents [exp]
+	end)
+*)
+
+consty :
+  spconsty
+    (spconsty)
+| typeseq tycon
+    (fn parents =>
+	let val tn  = tycon []
+	    val ts  = typeseq ()
+	    val reg = R.consReg typeseqright tyconleft
+	in A.mk_new_pterm A.TYPE_TYCON "" [reg] parents [tn, ts]
+	end)
+
+spconsty :
+  atty
+    (atty)
+| tycon
+    (fn parents =>
+	let val tc = tycon []
+	    val ts = A.mk_new_term A.TYPESEQ_EM "" [] []
+	in A.mk_new_pterm A.TYPE_TYCON "" [] parents [tc, ts]
+	end)
+
+(*| LPAREN identid COLON consty RPAREN
+    (fn parents =>
+	let val tregs1 = R.getRegionList COLONright constyleft
+	    val tregs2 = R.getRegionList constyright RPARENleft
+	    val iregs1 = R.getRegionList LPARENright identidleft
+	    val iregs2 = R.getRegionList identidright COLONleft
+	    val id     = identid (iregs1 @ iregs2)
+	    val ty     = consty (tregs1 @ tregs2)
+	    val reg    = R.consReg COLONleft COLONright
+	in A.mk_new_pterm A.TYPE_DEP "" [reg] parents [id, ty]
+	end)*)
+
+typevarseqcomma :
+  typevar COMMA typevar
+    (fn () =>
+	let val tyvar1 = typevar1 ()
+	    val tyvar2 = typevar2 ()
+	    val reg = R.consReg COMMAleft COMMAright
+	in ([tyvar1, tyvar2], [reg])
+	end)
+| typevar COMMA typevarseqcomma
+    (fn () =>
+	let val tyvar = typevar ()
+	    val (tyvars, regs) = typevarseqcomma ()
+	    val reg = R.consReg COMMAleft COMMAleft
+	in (tyvar :: tyvars, reg :: regs)
+	end)
+
+typeseqcomma :
+  typ COMMA typ
+    (fn () =>
+	let val tregs1 = R.getRegionList typ1right COMMAleft
+	    val tregs2 = R.getRegionList COMMAright typ2left
+	    val ty1    = typ1 tregs1
+	    val ty2    = typ2 tregs2
+	    val reg    = R.consReg COMMAleft COMMAright
+	in ([ty1, ty2], [reg])
+	end)
+| typ COMMA typeseqcomma
+    (fn () =>
+	let val tregs = R.getRegionList typright COMMAleft
+	    val ty    = typ tregs
+	    val reg   = R.consReg COMMAleft COMMAleft
+	    val (tys, regs) = typeseqcomma ()
+	in (ty :: tys, reg :: regs)
+	end)
+
+typevarseq :
+  typevar
+    (fn () =>
+	let val tyvar = typevar ()
+	in A.mk_new_term A.TYPEVARSEQ_ONE "" [] [tyvar]
+	end)
+| LPAREN typevarseqcomma RPAREN
+    (fn () =>
+	let val (tvs, regs) = typevarseqcomma ()
+	    val reg1 = R.consReg LPARENleft LPARENleft
+	    val reg2 = R.consReg RPARENleft RPARENleft
+	in A.mk_new_term A.TYPEVARSEQ_SEQ "" ([reg1] @ regs @ [reg2]) tvs
+	end)
+
+typeseq :
+  consty
+    (fn () =>
+	let val ty = consty []
+	in A.mk_new_term A.TYPESEQ_ONE "" [] [ty]
+	end)
+| LPAREN typeseqcomma RPAREN
+    (fn () =>
+	let val (tys, regs) = typeseqcomma ()
+	    val reg1 = R.consReg LPARENleft LPARENleft
+	    val reg2 = R.consReg RPARENleft RPARENleft
+	in A.mk_new_term A.TYPESEQ_SEQ "" ([reg1] @ regs @ [reg2]) tys
+	end)
+
+otypeseq :
+  typeseq
+    (fn () =>
+	let val typeseq = typeseq ()
+	in A.mk_new_term A.OTYPESEQ_UNM "" [] [typeseq]
+	end)
+| ID COLON typeseq
+    (fn () =>
+	let val typeseq = typeseq ()
+	in A.mk_new_term A.OTYPESEQ_NAM ID [] [typeseq]
+	end)
+
+typeseqlist :
+  otypeseq
+    (fn () =>
+	let val otypeseq = otypeseq ()
+	in ([otypeseq], [])
+	end)
+| otypeseq COMMA typeseqlist
+    (fn () =>
+	let val t          = otypeseq ()
+	    val (ts, regs) = typeseqlist ()
+	    val reg        = R.consReg COMMAleft COMMAright
+	in (t :: ts, reg :: regs)
+	end)
+
+typeseqset :
+  LBRACE typeseqlist RBRACE
+    (fn () =>
+	let val (typeseqlist, regs) = typeseqlist ()
+	in A.mk_new_term A.TYPESEQSET_SET "" regs typeseqlist
+	end)
+
+(*typexp :
+  tuptyexp
+    (tuptyexp)
+| tupty TYPEARROW typ
+    (fn () =>
+	let val t1  = tupty ()
+	    val t2  = typ ()
+	    val reg = R.consReg TYPEARROWleft TYPEARROWright
+	in A.mk_new_term A.TYPE_ARROW "" [reg] [t1, t2]
+	end)
+| typ PLUS typ
+    (fn () =>
+	let val t1  = typ1 ()
+	    val t2  = typ2 ()
+	    val reg = R.consReg PLUSleft PLUSright
+	in A.mk_new_term A.TYPE_DISJU "" [reg] [t1, t2]
+	end)*)
+
+(*tuptyexp :
+  typetupleexp
+    (fn () =>
+	let val (tys, regs) = typetupleexp ()
+	in case tys of
+	       [] => raise EH.Impossible ""
+	     | [ty] => ty
+	     | _ => A.mk_new_term A.TYPE_TUPLE "" regs tys
+	end)*)
+
+(*typetupleexp :
+  constyexp
+    (fn () =>
+	let val ty = constyexp ()
+	in ([ty], [])
+	end)
+|  consty' STAR typetuple
+    (fn () =>
+	let val ty  = consty' ()
+	    val (tys, regs) = typetuple ()
+	    val reg = R.consReg STARleft STARright
+	in (ty :: tys, reg :: regs)
+	end)*)
+
+(*constyexp :
+  atty
+    (atty)
+| typeseq tycon
+    (fn () =>
+	let val tn = tycon ()
+	    val ts = typeseq ()
+	in A.mk_new_term A.TYPE_TYCON "" [] [tn, ts]
+	end)
+| tycon
+    (fn () =>
+	let val tn = tycon ()
+	    val ts = A.mk_new_term A.TYPESEQ_EM "" [] []
+	in A.mk_new_term A.TYPE_TYCON "" [] [tn, ts]
+	end)*)
+
+pat :
+  infpat
+    (infpat)
+| pat COLON typc
+    (fn parents =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val pregs = R.getRegionList patright   COLONleft
+	    val pat   = pat  pregs
+	    val ty    = typc tregs
+	    val reg   = R.consReg COLONleft COLONright
+	in A.mk_new_pterm A.PAT_TYPED "" [reg] parents [pat, ty]
+	end)
+(*| ident AS pat
+    (fn parents =>
+	let val iregs = R.getRegionList identright ASleft
+	    val pregs = R.getRegionList ASright patleft
+	    val id    = ident iregs
+	    val pat   = pat pregs
+	    val reg   = R.consReg ASleft ASright
+	in A.mk_new_pterm A.PAT_AS "" [reg] parents [id, pat]
+	end)*)
+
+pat' :
+  atpat'
+    (fn parents =>
+	let val atpat = atpat' []
+	in A.mk_new_pterm A.PAT_ATPAT "" [] parents [atpat]
+	end)
+| pat' COLON typc
+    (fn parents =>
+	let val tregs = R.getRegionList COLONright typcleft
+	    val pregs = R.getRegionList pat'right  COLONleft
+	    val pat   = pat' pregs
+	    val ty    = typc tregs
+	    val reg   = R.consReg COLONleft COLONright
+	in A.mk_new_pterm A.PAT_TYPED "" [reg] parents [pat, ty]
+	end)
+
+atpat' :
+  atpat
+    (atpat)
+| ident
+    (fn parents =>
+	let val id = ident []
+	in A.mk_new_pterm A.ATPAT_ID "" [] parents [id]
+	end)
+
+atpat'' :
+  atpat
+    (atpat)
+| identid
+    (fn parents =>
+	let val id = identid []
+	in A.mk_new_pterm A.ATPAT_ID "" [] parents [id]
+	end)
+
+apppat :
+  ID
+    ([F.O (ID, R.consReg IDleft IDright)])
+| SET
+    ([F.O ("set", R.consReg SETleft SETright)])
+| MAP
+    ([F.O ("map", R.consReg MAPleft MAPright)])
+| INTERNAL
+    ([F.O ("internal", R.consReg INTERNALleft INTERNALright)])
+| OUTPUT
+    ([F.O ("output", R.consReg OUTPUTleft OUTPUTright)])
+| INPUT
+    ([F.O ("input", R.consReg INPUTleft INPUTright)])
+| STAR
+    ([F.O (A.id_int_mult, R.consReg STARleft STARright)])
+| PLUS
+    ([F.O (A.id_int_plus, R.consReg PLUSleft PLUSright)])
+| DOT
+    ([F.O (A.id_list_cons, R.consReg DOTleft DOTright)])
+| APPEND
+    ([F.O (A.id_list_concat, R.consReg APPENDleft APPENDright)])
+| atpat
+    ([F.L (atpat, R.consReg atpatleft atpatright)])
+| ID apppat
+    ((F.O (ID, R.consReg IDleft IDright)) :: apppat)
+| SET apppat
+    ((F.O ("set", R.consReg SETleft SETright)) :: apppat)
+| MAP apppat
+    ((F.O ("map", R.consReg MAPleft MAPright)) :: apppat)
+| INTERNAL apppat
+    ((F.O ("internal", R.consReg INTERNALleft INTERNALright)) :: apppat)
+| OUTPUT apppat
+    ((F.O ("output", R.consReg OUTPUTleft OUTPUTright)) :: apppat)
+| INPUT apppat
+    ((F.O ("input", R.consReg INPUTleft INPUTright)) :: apppat)
+| STAR apppat
+    ((F.O (A.id_int_mult, R.consReg STARleft STARright)) :: apppat)
+| PLUS apppat
+    ((F.O (A.id_int_plus, R.consReg PLUSleft PLUSright)) :: apppat)
+| DOT apppat
+    ((F.O (A.id_list_cons, R.consReg DOTleft DOTright)) :: apppat)
+| APPEND apppat
+    ((F.O (A.id_list_concat, R.consReg APPENDleft APPENDright)) :: apppat)
+| CLASSOPT apppat
+    ((F.O (A.id_class_opt, R.consReg CLASSOPTleft CLASSOPTright)) :: apppat)
+| CLASSOPTC apppat
+    ((F.O (A.id_class_opt_c, R.consReg CLASSOPTCleft CLASSOPTCright)) :: apppat)
+| atpat apppat
+    ((F.L (atpat, R.consReg atpatleft atpatright)) :: apppat)
+(* | AT apppat *)
+(*     ((F.O (A.id_class_at, R.consReg ATleft ATright)) :: apppat) *)
+(* | AT *)
+(*     ([F.O (A.id_class_at, R.consReg ATleft ATright)]) *)
+
+infpat :
+  apppat
+    (fn parents =>
+	let fun cons2 (F.L (pat, _)) parents = pat parents
+	      | cons2 (F.O _) _ = raise EH.Impossible ""
+	      | cons2 (F.N ((st, r), t1, t2)) parents = cons1 (F.N ((st, r), t1, t2)) parents
+
+	    and cons1 (F.L (pat, _)) regs = pat regs
+	      | cons1 (F.O _) _ = raise EH.Impossible ""
+	      | cons1 (F.N ((st, r), t1, t2)) regs =
+		let val regs1 = getRegion (R.getTo (F.getRight t1)) (R.getFrom r)
+		    val regs2 = getRegion (R.getTo r) (R.getFrom (F.getLeft t2))
+		    val pat1  = cons2 t1 regs1
+		    val pat2  = cons2 t2 regs2
+		in if st = A.id_list_cons
+		   then A.mk_new_pterm A.PAT_CONS st [r] regs [pat1, pat2]
+		   else raise EH.Impossible ". is the only binary operator allowed in patterns"
+		end
+
+	    fun toAtPat (F.O (st, reg)) parents =
+		let val id = A.mk_new_term A.ID_VID st [reg] []
+		in (A.mk_new_pterm A.ATPAT_ID st [] parents [id], reg)
+		end
+	      | toAtPat (F.L (atpat, reg)) parents = (atpat parents, reg)
+	      | toAtPat (F.N _) _ = raise EH.Impossible "there should be no node at this stage yet"
+
+	    fun toApp [] _ = raise EH.Impossible ""
+	      | toApp [atpat] parents =
+		let val (atpat, reg) = atpat []
+		in (A.mk_new_pterm A.PAT_ATPAT "" [] parents [atpat], reg)
+		end
+	      | toApp atpats parents =
+		let val atpatsBeg     = List.rev (List.tl (List.rev atpats))
+		    val atpatEnd      = List.hd (List.rev atpats)
+		    val (pat,   reg1) = toApp atpatsBeg []
+		    val (atpat, reg2) = atpatEnd []
+		    val regs          = getRegion (R.getTo reg1) (R.getFrom reg2)
+		    val reg           = R.consReg (R.getFrom reg1) (R.getTo reg2)
+		in case A.getIdPat pat of
+		       SOME id => (A.mk_new_pterm A.PAT_APP "" regs parents [id, atpat], reg)
+		     | NONE => raise EH.Impossible "only an identifier can be at a function position in a pattern"
+		end
+
+	    fun toApp' [] = []
+	      | toApp' atpats =
+		let val fst  = List.hd atpats
+		    val lst  = List.hd (List.rev atpats)
+		    val reg  = R.consReg (R.getFrom (F.getLeft fst)) (R.getTo (F.getRight lst))
+		    val fpat = fn parents => #1 (toApp (map toAtPat atpats) parents)
+		in [F.L (fpat, reg)]
+		end
+
+	    fun convNonOp [] rest = toApp' rest
+	      | convNonOp ((F.O (st, reg)) :: xs) rest =
+		if F.isInfix st
+		then (toApp' rest) @ [F.O (st, reg)] @ (convNonOp xs [])
+		else let val atpat =
+			  fn parents =>
+			     let val id = A.mk_new_term A.ID_VID st [reg] []
+			     in A.mk_new_pterm A.ATPAT_ID "" [] parents [id]
+			     end
+		     in convNonOp xs (rest @ [F.L (atpat, reg)])
+		     end
+	      | convNonOp ((F.L (atpat, regs)) :: xs) rest = convNonOp xs (rest @ [F.L (atpat, regs)])
+	      | convNonOp ((F.N _) :: xs) _ = raise EH.Impossible "there should be no node at this stage"
+
+	in cons1 (F.convert (convNonOp apppat [])) parents
+	end handle EH.Impossible st =>
+		   let val reg = R.consReg apppatleft apppatright
+		       val _   = PD.set_parsing_error (st, [reg])
+		   in A.mk_new_term A.DOTS_D "" [reg] []
+		   end)
+
+atpattuple :
+  pat COMMA pat
+    (fn () =>
+	let val pregs1 = R.getRegionList pat1right COMMAleft
+	    val pregs2 = R.getRegionList COMMAright pat2left
+	    val pat1   = pat1 pregs1
+	    val pat2   = pat2 pregs2
+	    val reg    = R.consReg COMMAleft COMMAleft
+	in ([pat1, pat2], [reg])
+	end)
+|  pat COMMA atpattuple
+    (fn () =>
+	let val pregs = R.getRegionList patright COMMAleft
+	    val pat   = pat pregs
+	    val reg   = R.consReg COMMAleft COMMAleft
+	    val (pats, regs) = atpattuple ()
+	in (pat :: pats, reg :: regs)
+	end)
+
+atpat :
+  WILD
+    (fn parents =>
+	let val reg = R.consReg WILDleft WILDright
+	in A.mk_new_pterm A.ATPAT_WILD "" [reg] parents []
+	end)
+| scon
+    (fn parents =>
+	let val sc = scon []
+	in A.mk_new_pterm A.ATPAT_SCON "" [] parents [sc]
+	end)
+| LLIST patlist RLIST
+    (fn parents =>
+	let val (pats, regs) = patlist ()
+	    val reg1 = R.consReg LLISTleft LLISTleft
+	    val reg2 = R.consReg RLISTleft RLISTleft
+	in A.mk_new_pterm A.ATPAT_LIST "" ([reg1] @ regs @ [reg2]) parents pats
+	end)
+| LPAREN RPAREN
+    (fn parents =>
+	let val reg = R.consReg LPARENleft RPARENright
+	in A.mk_new_pterm A.ATPAT_TUPLE "" [reg] parents []
+	end)
+| LPAREN atpattuple RPAREN
+    (fn parents =>
+	let val (pats, regs) = atpattuple ()
+	    val reg1 = R.consReg LPARENleft LPARENleft
+	    val reg2 = R.consReg RPARENleft RPARENleft
+	in A.mk_new_pterm A.ATPAT_TUPLE "" ([reg1] @ regs @ [reg2]) parents pats
+	end)
+| LPAREN pat RPAREN
+    (fn parents =>
+	let val pregs1 = R.getRegionList LPARENright patleft
+	    val pregs2 = R.getRegionList patright RPARENleft
+	    val pat    = pat (pregs1 @ pregs2)
+	    val reg1   = R.consReg LPARENleft LPARENleft
+	    val reg2   = R.consReg RPARENleft RPARENleft
+	in A.mk_new_pterm A.ATPAT_PAREN "" [reg1, reg2] parents [pat]
+	end)
+| STRUCT COLON ident
+     (fn parents =>
+	 let val iregs = R.getRegionList COLONright identleft
+	     val id    = ident iregs
+	     val reg1  = R.consReg STRUCTleft STRUCTright
+	     val reg2  = R.consReg COLONleft COLONright
+	 in A.mk_new_pterm A.ATPAT_STRUC "" [reg1, reg2] parents [id]
+	 end)
+
+patlist :
+    (fn () => ([], []))
+| nepatlist
+    (nepatlist)
+
+nepatlist :
+  pat
+    (fn () =>
+	let val pat = pat []
+	in ([pat], [])
+	end)
+| pat SEMICOLON nepatlist
+    (fn () =>
+	let val pregs = R.getRegionList patright SEMICOLONleft
+	    val pat   = pat pregs
+	    val reg   = R.consReg SEMICOLONleft SEMICOLONleft
+	    val (pats, regs) = nepatlist ()
+	in (pat :: pats, reg :: regs)
+	end)
+
+(*bpatlist :
+    (fn () => ([], []))
+| nebpatlist
+    (nebpatlist)*)
+
+(*nebpatlist :
+  pat
+    (fn () =>
+	let val pat = pat ()
+	in ([pat], [])
+	end)
+| pat COMMA nebpatlist
+    (fn () =>
+	let val pat = pat ()
+	    val (pats, regs) = nebpatlist ()
+	    val reg = R.consReg COMMAleft COMMAright
+	in (pat :: pats, reg :: regs)
+	end)*)

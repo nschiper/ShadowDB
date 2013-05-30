@@ -1,0 +1,366 @@
+(* Copyright 2011 Cornell University
+ * Copyright 2012 Cornell University
+ * Copyright 2013 Cornell University
+ *
+ *
+ * This file is part of EventML - a tool aiming at specifying
+ * distributed protocols in an ML like language.  It is an interface
+ * to the logic of events and is compiled into Nuprl.  It is written
+ * by the NUPRL group of Cornell University, Ithaca, NY.
+ *
+ * EventML is a free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * EventML is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with EventML.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *  o Authors:     Vincent Rahli
+ *  o Affiliation: Cornell University, NUPRL group
+ *  o Date:        30 Sep 2011
+ *  o File name:   Config.grm
+ *  o Description: Grammar for config files
+ *)
+
+
+structure T = NuprlTerms
+
+structure SET = BinarySetFn(type ord_key = string val compare = String.compare)
+
+type 'a t  = unit    -> 'a
+type 'a u  = SET.set -> 'a
+
+type location    = string
+type host        = string
+type port        = int
+type address     = location * host * port
+type group_name  = string
+type member      = bool
+type group       = group_name * member * address list
+type conn        = group_name * group_name
+type parameter   = string * T.nuprl_term
+type message     = T.nuprl_term * T.nuprl_term * T.nuprl_term
+type loc_message = location * message
+type config      = group list * conn list * parameter list * loc_message list
+
+fun get_locs_from_groups groups =
+    foldr (fn ((_,_,locs),set) =>
+	      foldr (fn ((loc,_,_),set) => SET.add (set,loc))
+		    set
+		    locs)
+	  SET.empty
+	  groups
+
+%%
+
+
+%name Config
+
+
+%term
+  LLIST
+| RLIST
+| LBRACE
+| RBRACE
+| COMMA
+| COLON
+| SEMICOLON
+| LPAREN
+| RPAREN
+| LATOMS
+| RATOMS
+| LOC
+| DEQ
+| TYPE
+| EXTERNAL
+| CONNECTIONS
+| LOCATIONS
+| PARAMETERS
+| MESSAGES
+| ARROW
+| STAR
+| LAMBDA
+| EQUAL
+| IF
+| THEN
+| ELSE
+| DOT
+| AND
+| ID      of string
+| NUM     of string
+| INT     of string
+| EOF
+
+
+%nonterm
+  config        of config t
+| conf_group    of (string * bool * address list) t
+| conf_groups   of (string * bool * address list) list t
+| conn          of (string * string) u
+| conns         of (string * string) list u
+| conf_conns    of (string * string) list u
+| conf_params   of parameter list t
+| conf_msgs     of loc_message list t
+| numeral       of string t
+| ip            of string t
+| location      of address t
+| locations     of address list t
+| parameters    of parameter   list t
+| message       of message t
+| messages      of loc_message list t
+| exp           of T.nuprl_term u
+| expint        of T.nuprl_term t
+| exploc        of T.nuprl_term t
+| expdeq        of T.nuprl_term t
+| expeq         of T.nuprl_term t
+| typ           of T.nuprl_term t
+| atty          of T.nuprl_term t
+| explist       of T.nuprl_term list u
+| explist'      of T.nuprl_term list u
+| atoms         of string list t
+| atomlist      of string list t
+
+%nonassoc DOT
+%left  COMMA
+%right ARROW
+%left  EQUAL
+%left  SEMICOLON
+%left  STAR
+%left  COLON
+
+%pos int * int
+
+%eop EOF
+
+%noshift EOF
+
+%start config
+
+%verbose
+
+
+%%
+
+
+config :
+  conf_groups conf_conns conf_params conf_msgs
+    (fn () =>
+	let val grps  = conf_groups ()
+	    val conns = conf_conns  (get_locs_from_groups grps)
+	    val prms  = conf_params ()
+	    val msgs  = conf_msgs   ()
+	in (grps, conns, prms, msgs)
+	end)
+| message
+    (fn () => ([], [], [], [("", message ())]))
+| ID COLON message
+    (fn () => ([], [], [], [(ID, message ())]))
+
+conf_groups :
+  conf_group
+    (fn () => [conf_group ()])
+| conf_group conf_groups
+    (fn () => (conf_group ()) :: (conf_groups ()))
+
+conf_group :
+  LOCATIONS ID locations
+    (fn () => (ID, true, locations ()))
+| LOCATIONS EXTERNAL ID locations
+    (fn () => (ID, false, locations ()))
+
+conn :
+  ID ARROW ID
+    (fn set =>
+	if SET.member (set, ID2)
+	then raise Fail "error in configuration file: an external group can only connect to another group"
+	else (ID1, ID2))
+
+conns :
+  conn
+    (fn set => [conn set])
+| conn conns
+    (fn set => (conn set) :: (conns set))
+
+conf_conns :
+  CONNECTIONS conns (conns)
+
+conf_params :
+  PARAMETERS parameters
+    (parameters)
+
+conf_msgs :
+    (fn () => [])
+| MESSAGES messages
+    (messages)
+
+numeral :
+  NUM (fn () => NUM)
+| INT (fn () => INT)
+
+ip :
+  ID
+    (fn () => ID)
+| numeral DOT numeral DOT numeral DOT numeral
+    (fn () =>
+	let val n1 = numeral1 ()
+	    val n2 = numeral2 ()
+	    val n3 = numeral3 ()
+	    val n4 = numeral4 ()
+	in n1 ^ "." ^
+	   n2 ^ "." ^
+	   n3 ^ "." ^
+	   n4
+	end)
+
+location :
+  ID COLON ip numeral
+    (fn () =>
+	let val str = numeral ()
+	    val opt = Int.fromString str
+	    val n   = Option.valOf opt
+	in (ID, ip (), n)
+	end)
+
+locations :
+  location
+    (fn () => [location ()])
+| location locations
+    (fn () => location () :: locations ())
+
+parameters :
+    (fn () => [])
+| ID COLON TYPE LPAREN typ RPAREN parameters
+    (fn () => (ID, typ ()) :: parameters ())
+| ID COLON exp parameters
+    (fn () => (ID, exp SET.empty) :: parameters ())
+
+atomlist :
+    (fn () => [])
+| ID atomlist
+    (fn () => ID :: atomlist ())
+
+atoms :
+  LATOMS atomlist RATOMS
+    (atomlist)
+
+message :
+  LPAREN atoms COMMA typ COMMA exp RPAREN
+    (fn () =>
+	let val lst = map T.mk_regular_token_term (atoms ())
+	    val hdr = T.mk_nuprl_finite_list_term lst
+	in (hdr, typ (), exp SET.empty)
+	end)
+
+messages :
+    (fn () => [])
+| ID COLON message messages
+    (fn () =>
+	let val (hdr, typ, exp) = message ()
+	in (ID, (hdr, typ, exp)) :: messages ()
+	end)
+
+explist' :
+  exp
+    (fn vars => [exp vars])
+| exp SEMICOLON explist'
+    (fn vars => exp vars :: explist' vars)
+
+explist :
+    (fn vars => [])
+| explist'
+    (explist')
+
+exp :
+  ID
+    (fn vars =>
+	if SET.member (vars, ID)
+	then T.mk_variable_term ID
+	else T.mk_nuprl_simple_term ID [])
+| atoms
+    (fn vars => T.mk_nuprl_finite_list_term (map T.mk_regular_token_term (atoms ())))
+| expint
+    (fn vars => expint ())
+| exploc
+    (fn vars => exploc ())
+| expdeq
+    (fn vars => expdeq ())
+| expeq
+    (fn vars => expeq ())
+| LLIST explist RLIST
+    (fn vars => T.mk_nuprl_finite_list_term (explist vars))
+| LBRACE explist RBRACE
+    (fn vars => T.mk_nuprl_finite_list_term (explist vars))
+| LAMBDA ID DOT exp
+    (fn vars => T.mk_lambda_term ID (exp (SET.add (vars, ID))))
+| IF exp THEN exp ELSE exp
+    (fn vars => T.mk_nuprl_ite_term (exp1 vars) (exp2 vars) (exp3 vars))
+| LPAREN exp COMMA exp RPAREN
+    (fn vars => T.mk_pair_term (exp1 vars) (exp2 vars))
+| LPAREN RPAREN
+    (fn vars => T.mk_nuprl_it_term)
+
+expeq :
+  expint EQUAL expint
+    (fn () => T.mk_nuprl_eq_int_term (expint1 ()) (expint2 ()))
+| ID EQUAL expint
+    (fn () => T.mk_nuprl_eq_int_term (T.mk_variable_term ID) (expint ()))
+| expint EQUAL ID
+    (fn () => T.mk_nuprl_eq_int_term (expint ()) (T.mk_variable_term ID))
+| exploc EQUAL exploc
+    (fn () => T.mk_nuprl_eq_loc_term (exploc1 ()) (exploc2 ()))
+| ID EQUAL exploc
+    (fn () => T.mk_nuprl_eq_loc_term (T.mk_variable_term ID) (exploc ()))
+| exploc EQUAL ID
+    (fn () => T.mk_nuprl_eq_loc_term (exploc ()) (T.mk_variable_term ID))
+
+expdeq :
+  DEQ LPAREN typ RPAREN
+    (fn () => T.toDeq (typ ()))
+
+exploc :
+  LOC LPAREN ID RPAREN
+    (fn () => T.mk_mkid_term ID)
+
+expint :
+  numeral
+    (fn () =>
+	let val str = numeral ()
+	    val opt = Int.fromString str
+	    val n   = Option.valOf opt
+	in T.mk_nuprl_small_integer_term n
+	end)
+
+atty :
+  ID
+    (fn () =>
+	case ID of
+	    "Int"    => T.mk_int_term
+	  | "Tok"    => T.mk_atom_term NONE
+	  | "Atom"   => T.mk_atom_term NONE
+	  | "Loc"    => T.mk_nuprl_loc_term
+	  | "Unit"   => T.mk_nuprl_unit_term
+	  | "Bool"   => T.mk_nuprl_bool_term
+	  | _        => T.mk_nuprl_simple_term ID [])
+| LPAREN typ RPAREN
+    (fn () => typ ())
+
+typ :
+  atty
+    (atty)
+| atty ID
+    (fn () =>
+	let val t = atty ()
+	in case ID of
+	       "List" => T.mk_nuprl_list_term t
+	     | _      => T.mk_nuprl_simple_term ID [t]
+	end)
+| typ ARROW typ
+    (fn () => T.mk_fun_term (typ1 ()) (typ2 ()))
+| typ STAR typ
+    (fn () => T.mk_prod_term (typ1 ()) (typ2 ()))
