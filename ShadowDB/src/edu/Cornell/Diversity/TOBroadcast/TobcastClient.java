@@ -57,6 +57,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import edu.Cornell.Diversity.ShadowDB.ShadowDBConfig;
 import edu.Cornell.Diversity.TOBroadcast.AnerisMessage.ANERIS_MSG_TYPE;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 import edu.Cornell.Diversity.Utils.NIOUtils;
@@ -72,12 +73,6 @@ public class TobcastClient extends Thread {
 	private static final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.TOBroadcast.TobcastClient");
 
 	public enum AnerisType {INTERPRETED, LISP};
-
-	/**
-	 * The maximum number of bytes for a message residing
-	 * in a byte buffer. This can be increased if needed.
-	 */
-	private static final int MAX_MSG_SIZE = 20000;
 
 	/**
 	 * The number of delivered messages between garbage
@@ -162,7 +157,7 @@ public class TobcastClient extends Thread {
 			DELIVERED_MSG_LOCK = new ReentrantLock();
 			DELIVERED_MSG_COND = DELIVERED_MSG_LOCK.newCondition();
 
-			ByteBuffer buffer = ByteBuffer.allocate(MAX_MSG_SIZE);
+			ByteBuffer buffer = ByteBuffer.allocate(ShadowDBConfig.getMaxMsgSize());
 			SOCKETS = new SocketChannel[servers.size()];
 			connectToServers(SOCKETS, servers, clientPort, buffer);
 			SELECTOR = Selector.open();
@@ -242,7 +237,7 @@ public class TobcastClient extends Thread {
 
 	public void run() {
 		HashSet<SelectionKey> keys = new HashSet<SelectionKey>();
-		ByteBuffer byteBuffer = ByteBuffer.allocate(MAX_MSG_SIZE);
+		ByteBuffer byteBuffer = ByteBuffer.allocate(ShadowDBConfig.getMaxMsgSize());
 		long slotNextMsg = 1l;
 		long seqNo = 0l;
 
