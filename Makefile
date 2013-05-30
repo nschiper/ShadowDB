@@ -43,13 +43,13 @@ clean:
 	rm jars/ShadowDB.jar
 
 testdb:
-	(cd scripts; ./startDbServer.sh 1 stdalone INTERPRETED)
+	(cd scripts; ./startDbServer.sh 1 ../conf/conf_aneris_local.emlc stdalone INTERPRETED)
 
 testrep1:
-	(cd scripts; ./startDbServer.sh 1 replicated INTERPRETED)
+	(cd scripts; ./startDbServer.sh 1 ../conf/conf_aneris_local.emlc replicated INTERPRETED)
 
 testrep2:
-	(cd scripts; ./startDbServer.sh 2 replicated INTERPRETED)
+	(cd scripts; ./startDbServer.sh 2 ../conf/conf_aneris_local.emlc replicated INTERPRETED)
 
 testbank:
 	(cd scripts; ./startBankingClient.sh read-only 50000 5 5 1)
