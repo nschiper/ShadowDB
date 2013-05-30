@@ -12,9 +12,11 @@ I did not have any luck installing the FreeBSD package using pkg_add,
 but extracting the archive was enough.  The archive already contains
 these three binaries.
 
-3) To generate the Nuprl library file, type 'make lib'
+3) To generate the Nuprl library file, type 'make lib'.
 
-NOTE: to generate everything type: 'make'
+NOTE: 1), 2), and 3) can be done by simply typing 'make'.
+
+4) To install the SBCL Lisp compiler on FreeBSD, type 'pkg_add -r sbcl'.
 
 CONFIGURATION
 -------------
