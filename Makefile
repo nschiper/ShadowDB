@@ -43,13 +43,13 @@ clean:
 	rm jars/ShadowDB.jar
 
 testdb:
-	(cd scripts; ./startDbServer.sh 1 stdalone)
+	(cd scripts; ./startDbServer.sh 1 stdalone INTERPRETED)
 
 testrep1:
-	(cd scripts; ./startDbServer.sh 1 replicated)
+	(cd scripts; ./startDbServer.sh 1 replicated INTERPRETED)
 
 testrep2:
-	(cd scripts; ./startDbServer.sh 2 replicated)
+	(cd scripts; ./startDbServer.sh 2 replicated INTERPRETED)
 
 testbank:
 	(cd scripts; ./startBankingClient.sh read-only 50000 5 5 1)
