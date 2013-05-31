@@ -6,7 +6,7 @@ ShadowDB subdirectory. This will create the file 'ShadowDB.jar' in the
 project root directory.
 
 2) To compile Aneris, type 'make aneris'.  This requires mlton,
-mlyacc, and mllex.  MLton can be downloaded from
+mlyacc, and mllex.  MLton can be downloaded from:
   http://sourceforge.net/projects/mlton/files/mlton/20100608/
 I did not have any luck installing the FreeBSD package using pkg_add,
 but extracting the archive was enough.  The archive already contains
@@ -22,19 +22,23 @@ NOTE: 1), 2), and 3) can be done by simply typing 'make'.
 CONFIGURATION
 -------------
 
-Configuring ShadowDB is done by editing the file 'conf/conf_aneris.emlc'. Note that database 
-identifiers must start with "database" and the first database must have identifier "database1". 
-The database deployed at each replica can be chosen between 'h2', 'hsqldb', and 'derby' and is 
-specified in the configuration file.
+Configuring ShadowDB is done by editing the file
+'conf/conf_aneris.emlc'.  Note that database identifiers must start
+with "database" and the first database must have identifier
+"database1".  The database deployed at each replica can be chosen
+between 'h2', 'hsqldb', and 'derby' and is specified in the
+configuration file.
 
 
 TESTING
 -------
 
-ShadowDB can be tested with the provided scripts 'startAnerisX.sh' (where X is between 1 and 4),
-'startDbServer.sh', and 'startBankingClient.sh'. Each of one of these scripts takes parameters
-whose semantics are defined in the respective script file. Additionally, Aneris can be tested 
-with the script 'startTobcastClient.sh'.
+ShadowDB can be tested with the provided scripts 'startAnerisX.sh'
+(where X is between 1 and 4), 'startDbServer.sh', and
+'startBankingClient.sh'.  Each of one of these scripts takes
+parameters whose semantics are defined in the respective script file.
+Additionally, Aneris can be tested with the script
+'startTobcastClient.sh'.
 
 
 EXAMPLE
@@ -53,8 +57,8 @@ the scripts directory and type:
   ./startAneris3.sh local
   ./startAneris4.sh local
 
-As mentioned above, these 4 scripts use the conf_aneris_local.emlc
-instead of conf_aneris.emlc.
+As mentioned above, these 4 scripts use conf_aneris_local.emlc instead
+of conf_aneris.emlc.
 
 Alternatively, you can type:
 
