@@ -61,8 +61,6 @@ public class QueryResult implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
-	private boolean aborted = false;
-
 	private final LinkedHashMap<Integer, HashMap<String, Object>> results;
 
 	/**
@@ -78,10 +76,6 @@ public class QueryResult implements Serializable {
 		this.results = new LinkedHashMap<Integer, HashMap<String,Object>>();
 
 		addResultSet(resultSet);
-	}
-
-	public boolean hasAborted() {
-		return aborted;
 	}
 
 	/**

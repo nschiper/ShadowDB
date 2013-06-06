@@ -555,7 +555,8 @@ public class Group extends Thread {
 							reconfiguringGroup = true;
 						}
 					} else {
-						LOG.warning(registeredDb.dbIdToString() + " exception: " + e + " caught in ShadowDB server.");
+						LOG.severe(registeredDb.dbIdToString() + " exception: " + e + " caught in ShadowDB server, exiting JVM...");
+						System.exit(-1);
 					}
 				}
 			}
@@ -660,6 +661,9 @@ public class Group extends Thread {
 							removeMember(sce.getId(), registeredDb.getSeqNo());
 							reconfiguringGroup = true;
 						}
+					} else {
+						LOG.severe(registeredDb.dbIdToString() + " exception: " + e + " caught in ShadowDB server, exiting JVM...");
+						System.exit(-1);
 					}
 				}
 			}
