@@ -35,12 +35,12 @@
  ldrs_uid : \loc.if loc = LOC(ldr1) then 1 else 2
  locs     : {LOC(loc1);LOC(loc2);LOC(loc3);LOC(loc4)}
  reps     : {LOC(rep1);LOC(rep2)}
- clients  : {LOC(client1);LOC(client2)}
+ clients  : {LOC(client1);LOC(client2);LOC(client3)}
  flrs     : 1
  f        : \hdr.1
 
 %messages
 
 %databases
- database1 : 192.168.1.15 14522 mysql 
+ database1 : 192.168.1.15 14522 mysql
  database2 : 192.168.1.16 14522 derby

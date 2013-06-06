@@ -41,6 +41,6 @@
 %messages
 
 %databases
- database1 : 192.168.1.12 14522 mysql 
+ database1 : 192.168.1.12 14522 mysql
  database2 : 192.168.1.13 14522 derby
- database3 : 192.168.1.14 14524 derby 
+ database3 : 192.168.1.14 14524 derby

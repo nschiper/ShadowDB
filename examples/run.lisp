@@ -1498,13 +1498,16 @@
 
 (defun boot-up-prog (loc conf spec)
   (print-eml-loc loc "loading program")
+  (print-eml-loc loc "getting parameters")
   (let ((parameters (conf-parameters conf)))
     ;;(print-eml-loc loc (format nil "parameters: ~A" parameters))
     ;;(load spec-file)
+    (print-eml-loc loc "applying parameters")
     (let ((program (reduce (lambda (prg param)
 			     (funcall prg (mk-arg (parameter-value param))))
 			   parameters
 			   :initial-value (funcall spec))))
+      (print-eml-loc loc "applying location")
       (funcall program (mk-arg loc))
       )
     )

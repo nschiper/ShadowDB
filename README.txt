@@ -17,6 +17,15 @@ these three binaries.
 NOTE: 1), 2), and 3) can be done by simply typing 'make'.
 
 4) To install the SBCL Lisp compiler on FreeBSD, type 'pkg_add -r sbcl'.
+We're using several packages that we've installed using quicklisp.
+Here is how to get quicklisp and install these packages using quicklisp:
+    o Download quicklisp.lisp here: http://www.quicklisp.org/beta/
+    o run in sbcl: (load "quicklisp.lisp")
+    o then: (quicklisp-quickstart:install)
+    o then: (ql:quickload "cl-lex")
+    o then: (ql:quickload "yacc")
+    o then: (ql:quickload "marshal")
+    o then: (ql:add-to-init-file)
 
 
 CONFIGURATION
