@@ -20,15 +20,6 @@
 (require :marshal)
 (require :yacc)
 
-;;(load "yacc.fasl")
-;;(use-package '#:yacc)
-;;(load "packages.lisp")
-;;(load "lex.lisp")
-;;(use-package :cl-lex)
-
-;;(defun main () nil)
-
-
 ;; true to use the stream read/write and false to use the socket send/receive
 (defvar new-send-receive nil)
 ;; true to get the client to log its inputs
@@ -2192,7 +2183,7 @@
 
 ;;;;;; --------- tests ---------
 
-(defvar aneris-conf "../conf/conf_aneris_tobcast_lisp.emlc")
+(defvar aneris-conf "../conf/conf_aneris_local.emlc")
 
 (if cbn
     (load "aneris_fastrep2_opt4_2lisp3.fasl")

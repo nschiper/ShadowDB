@@ -35,6 +35,9 @@ shadowdb:
 aneris:
 	(cd aneris; make bin)
 
+aneris-lisp:
+	(cd scripts; ./compile-aneris-lisp.sh)
+
 .PHONY: lib
 lib:
 	(cd lib; tar -xvzf alldefs.tar.gz 2>/dev/null)

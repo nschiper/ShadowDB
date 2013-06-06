@@ -1,7 +1,6 @@
 DIR="../examples"
 SBCL=sbcl
 RUN_LISP_FILE=run.lisp
-RUN_LISP=${DIR}/${RUN_LISP_FILE}
 PWD=`pwd`
 
 cd $DIR
