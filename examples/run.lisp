@@ -2206,26 +2206,48 @@
   )
 
 ;; tests acceptors
-(defun test-acc1 () (run-distributed-program "acc1" conf-file main-spec))
-(defun test-acc2 () (run-distributed-program "acc2" conf-file main-spec))
-(defun test-acc3 () (run-distributed-program "acc3" conf-file main-spec))
+(defun test-acc1 (conf-file) (run-distributed-program "acc1" conf-file main-spec))
+(defun test-acc2 (conf-file) (run-distributed-program "acc2" conf-file main-spec))
+(defun test-acc3 (conf-file) (run-distributed-program "acc3" conf-file main-spec))
 ;; tests 2/3 locations
-(defun test-loc1 () (run-distributed-program "loc1" conf-file main-spec))
-(defun test-loc2 () (run-distributed-program "loc2" conf-file main-spec))
-(defun test-loc3 () (run-distributed-program "loc3" conf-file main-spec))
-(defun test-loc4 () (run-distributed-program "loc4" conf-file main-spec))
+(defun test-loc1 (conf-file) (run-distributed-program "loc1" conf-file main-spec))
+(defun test-loc2 (conf-file) (run-distributed-program "loc2" conf-file main-spec))
+(defun test-loc3 (conf-file) (run-distributed-program "loc3" conf-file main-spec))
+(defun test-loc4 (conf-file) (run-distributed-program "loc4" conf-file main-spec))
 ;; tests leaders
-(defun test-ldr1 () (run-distributed-program "ldr1" conf-file main-spec))
-(defun test-ldr2 () (run-distributed-program "ldr2" conf-file main-spec))
+(defun test-ldr1 (conf-file) (run-distributed-program "ldr1" conf-file main-spec))
+(defun test-ldr2 (conf-file) (run-distributed-program "ldr2" conf-file main-spec))
 ;; tests replicas
-(defun test-rep1 () (run-distributed-program "rep1" conf-file main-spec))
-(defun test-rep2 () (run-distributed-program "rep2" conf-file main-spec))
+(defun test-rep1 (conf-file) (run-distributed-program "rep1" conf-file main-spec))
+(defun test-rep2 (conf-file) (run-distributed-program "rep2" conf-file main-spec))
 ;; tests clients
-(defun test-client1 () (run-distributed-program "client1" conf-file main-spec))
+(defun test-client1 (conf-file) (run-distributed-program "client1" conf-file main-spec))
 ;; sender
-(defun test-propose (n m) (run-sender #'mk-propose-msg "xxx" "ldr2" n m conf-file))
-(defun test-bcast   (n m) (run-sender #'mk-bcast-msg   "xxx" "rep2" n m conf-file))
-(defun test-swap    (n)   (run-sender #'mk-swap-paxos  "xxx" "rep2" n n conf-file))
+(defun test-propose (n m conf-file) (run-sender #'mk-propose-msg "xxx" "ldr2" n m conf-file))
+(defun test-bcast   (n m conf-file) (run-sender #'mk-bcast-msg   "xxx" "rep2" n m conf-file))
+(defun test-swap    (n conf-file)   (run-sender #'mk-swap-paxos  "xxx" "rep2" n n conf-file))
+
+;; tests acceptors
+(defun t-acc1 () (test-acc1 conf-file))
+(defun t-acc2 () (test-acc2 conf-file))
+(defun t-acc3 () (test-acc3 conf-file))
+;; tests 2/3 locations
+(defun t-loc1 () (test-loc1 conf-file))
+(defun t-loc2 () (test-loc2 conf-file))
+(defun t-loc3 () (test-loc3 conf-file))
+(defun t-loc4 () (test-loc4 conf-file))
+;; tests leaders
+(defun t-ldr1 () (test-ldr1 conf-file))
+(defun t-ldr2 () (test-ldr2 conf-file))
+;; tests replicas
+(defun t-rep1 () (test-rep1 conf-file))
+(defun t-rep2 () (test-rep2 conf-file))
+;; tests clients
+(defun t-client1 () (test-client1 conf-file))
+;; sender
+(defun t-propose (n m) (test-propose n m conf-file))
+(defun t-bcast   (n m) (test-bcast   n m conf-file))
+(defun t-swap    (n)   (test-swap    n   conf-file))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
