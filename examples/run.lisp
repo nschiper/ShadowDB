@@ -1278,6 +1278,7 @@
   )
 
 (defun connect (loc socket host port)
+  (print-eml-loc loc (format nil "----connecting to host and port ~A ~A" host port))
   (handler-case
       (sb-bsd-sockets:socket-connect socket (sb-bsd-sockets:make-inet-address host) port)
     (sb-bsd-sockets:connection-refused-error
@@ -1556,7 +1557,7 @@
   (let ((n (receive-integer loc socket desc stream)))
     (let ((str (receive-one-message-len-aux loc n "" socket desc stream)))
       ;; TO COMMENT
-      (print-eml-loc loc (format nil "received: ~A" str))
+      ;; (print-eml-loc loc (format nil "received: ~A" str))
       str
       )
     )
@@ -1911,7 +1912,7 @@
 	(to    (get-loc-of-intransit-message   output))
 	(msg   (get-msg-of-intransit-message   output)))
     ;; TO COMMENT
-    (print-eml-loc loc (format nil "sending msg ~A to ~A" msg to))
+    ;; (print-eml-loc loc (format nil "sending msg ~A to ~A" msg to))
     (if (and (string= loc to) (= delay 0))
 	;; then we don't send the message through the socket, instead we're going
 	;; to directly apply the program to the message.
