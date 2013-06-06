@@ -27,6 +27,8 @@ Here is how to get quicklisp and install these packages using quicklisp:
     o then: (ql:quickload "marshal")
     o then: (ql:add-to-init-file)
 
+   The Lisp version of Aneris can be compiled by typing 'make aneris-lisp'.
+
 
 CONFIGURATION
 -------------
@@ -47,7 +49,8 @@ ShadowDB can be tested with the provided scripts 'startAnerisX.sh'
 'startBankingClient.sh'.  Each of one of these scripts takes
 parameters whose semantics are defined in the respective script file.
 Additionally, Aneris can be tested with the script
-'startTobcastClient.sh'.
+'startTobcastClient.sh'. To start Aneris in Lisp mode, use the
+scripts 'startAnerisX-lisp.sh'.
 
 
 EXAMPLE
