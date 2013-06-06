@@ -56,7 +56,7 @@ scripts 'startAnerisX-lisp.sh'.
 EXAMPLE
 -------
 
-This section explains how to test ShadowDB and Aneris locally.  We
+This section explains how to test ShadowDB and Aneris in interpreted mode locally.  We
 will use the conf/conf_aneris_local.emlc configuration file instead of
 the conf/conf_aneris.emlc file.
 
