@@ -6,9 +6,6 @@ EVENTML=${ANERIS}/bin/eventml
 ## configuration files
 CONF_DF=${ANERIS}/conf/conf_aneris.emlc
 CONF_LOC=${ANERIS}/conf/conf_aneris_local.emlc
-CONF_PB=${ANERIS}/conf/conf_aneris_pb.emlc
-CONF_TB=${ANERIS}/conf/conf_aneris_tobcast.emlc
-CONF_SMR=${ANERIS}/conf/conf_aneris_smr_lisp.emlc
 
 ## program files
 PROG_OPT=${ANERIS}/examples/aneris_fastrep_opt4.prog
