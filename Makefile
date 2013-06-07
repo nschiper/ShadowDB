@@ -55,7 +55,7 @@ testrep2:
 	(cd scripts; ./startDbServer.sh 2 ../conf/conf_aneris_local.emlc replicated INTERPRETED)
 
 testbank:
-	(cd scripts; ./startBankingClient.sh read-only 50000 5 5 1)
+	(cd scripts; ./startBankingClient.sh ../conf/conf_aneris_local.emlc read-only 50000 5 5 1)
 
 start1:
 	(cd scripts; ./startAneris1.sh local)

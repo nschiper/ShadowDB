@@ -50,6 +50,6 @@
 
 %databases
 
- database1 : 127.0.0.1 13200 h2
- database2 : 127.0.0.1 13201 h2
- database3 : 127.0.0.1 13202 h2
+ database1 : 127.0.0.1 13200 H2
+ database2 : 127.0.0.1 13201 H2
+ database3 : 127.0.0.1 13202 H2

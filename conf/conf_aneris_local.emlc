@@ -48,5 +48,5 @@
 
 %databases
 
- database1 : 127.0.0.1 14572
- database2 : 127.0.0.1 14580
+ database1 : 127.0.0.1 14572 H2
+ database2 : 127.0.0.1 14580 H2

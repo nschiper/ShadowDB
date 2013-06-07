@@ -19,22 +19,8 @@ case $1 in
     local)
 	EVENTML_CMD="${EVENTML} --i ${PROG_OPT} --conf ${CONF_LOC} --nuprl-defs ${ALLDEFS} --gc --extra "newsock:newprog" --id"
 	;;
-    pb)
-	EVENTML_CMD="${EVENTML} --i ${PROG_OPT} --conf ${CONF_PB} --nuprl-defs ${ALLDEFS} --gc --extra "newsock:newprog" --id"
-	;;
-    tobcast)
-	case $3 in
-	    opt)
-		echo "starting opt version of aneris"
-		EVENTML_CMD="${EVENTML} --i ${PROG_OPT2} --conf ${CONF_TB} --nuprl-defs ${ALLDEFS} --gc --extra "newsock:newprog:silent" --id"
-		;;
-	    *)
-		EVENTML_CMD="${EVENTML} --i ${PROG_NOOPT} --conf ${CONF_TB} --nuprl-defs ${ALLDEFS} --gc --extra "newsock:newprog:silent" --id"
-		;;
-	esac
-	;;
     *)
-	EVENTML_CMD="${EVENTML} --i ${PROG_OPT} --conf ${CONF_SMR} --nuprl-defs ${ALLDEFS} --gc --extra "newsock:newprog:silent" --id"
+	EVENTML_CMD="${EVENTML} --i ${PROG_OPT} --conf ${CONF_DF} --nuprl-defs ${ALLDEFS} --gc --extra "newsock:newprog:silent" --id"
 	;;
 esac
 
