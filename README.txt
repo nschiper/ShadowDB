@@ -38,7 +38,9 @@ Configuring ShadowDB is done by editing the file
 with "database" and the first database must have identifier
 "database1".  The database deployed at each replica can be chosen
 between 'h2', 'hsqldb', and 'derby' and is specified in the
-configuration file.
+configuration file. Additionally, when using ShadowDB with Aneris the configuration file should
+contain exactly one client per database (see sections %locations external clients
+and %databases in the configuration file). 
 
 
 TESTING
