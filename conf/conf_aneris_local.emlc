@@ -19,6 +19,7 @@
 
 %locations external clients
  client1 : 127.0.0.1 8875
+ client2 : 127.0.0.1 8876
 
 %connections
   acceptors  -> leaders
@@ -34,7 +35,7 @@
  ldrs_uid : \loc.if loc = LOC(ldr1) then 1 else 2
  locs     : {LOC(loc1);LOC(loc2);LOC(loc3);LOC(loc4)}
  reps     : {LOC(rep1);LOC(rep2)}
- clients  : {LOC(client1)}
+ clients  : {LOC(client1);LOC(client2)}
  flrs     : 1
  f        : \x.1
 
