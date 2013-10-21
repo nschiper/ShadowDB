@@ -64,7 +64,7 @@ public class AnerisMessage {
 	private static Pattern INTEGER_PATTERN = Pattern.compile("\\#(\\d+)\\#");
 	private static Pattern PORT_PATTERN = Pattern.compile("\\-(\\d+)\\#");
 	private static Pattern IP_PATTERN = Pattern.compile("\\-(\\d+\\-\\d+\\-\\d+\\-\\d+)\\-");
-	private static Pattern NATURAL_NUMBER_PATTERN = Pattern.compile("natural_number:OPID,\\d+:n");
+	private static Pattern NATURAL_NUMBER_PATTERN = Pattern.compile("natural_number:,\\d+:n");
 
 	/**
 	 * This is used to generate unique identifiers for broadcast messages.
