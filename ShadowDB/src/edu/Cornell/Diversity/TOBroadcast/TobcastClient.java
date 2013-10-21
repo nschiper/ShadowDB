@@ -59,6 +59,7 @@ import java.util.logging.Logger;
 
 import edu.Cornell.Diversity.ShadowDB.ShadowDBConfig;
 import edu.Cornell.Diversity.TOBroadcast.AnerisMessage.ANERIS_MSG_TYPE;
+import edu.Cornell.Diversity.Utils.AnerisMessageParser;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 import edu.Cornell.Diversity.Utils.NIOUtils;
 
@@ -240,16 +241,19 @@ public class TobcastClient extends Thread {
 		ByteBuffer byteBuffer = ByteBuffer.allocate(ShadowDBConfig.getMaxMsgSize());
 		long slotNextMsg = 1l;
 		long seqNo = 0l;
+		AnerisMessageParser[] anerisParsers = new AnerisMessageParser[SOCKETS.length];
 
 		/**
 		 * Registering the channels to do asynchronous I/O and
 		 * make the primary connect to the backups.
 		 */
 		try {
-			for (SocketChannel socket : SOCKETS) {
+			for (int i = 0; i < SOCKETS.length; i++) {
+				SocketChannel socket = SOCKETS[i];
 				SelectionKey key = socket.register(SELECTOR, SelectionKey.OP_READ);
 				keys.add(key);
-				key.attach(socket);
+				anerisParsers[i] = new AnerisMessageParser(socket);
+				key.attach(anerisParsers[i]);
 			}
 		} catch (Exception e) {
 			LOG.severe("Unable to initialize asynchronous I/O for tobcast client, caught exception: " + e);
@@ -274,29 +278,38 @@ public class TobcastClient extends Thread {
 						 * Incoming messages to be delivered
 						 */
 						if (keys.contains(key)) {
-							SocketChannel socketChannel = (SocketChannel) key.attachment();
-							String rcvdMsg = (String) NIOUtils.readFromAnerisChannel(socketChannel, byteBuffer);
+							AnerisMessageParser anerisParser = (AnerisMessageParser) key.attachment();
+							String rcvdMsg = null;
 
-							/**
-							 * Since it is enough to receive each command from only one replica, we first parse
-							 * the slot number to avoid parsing the message multiple times.
-							 */
-							long slot = AnerisMessage.parseSlot(rcvdMsg, ANERIS_TYPE);
+							if (!anerisParser.expectingPayload()) {
+								anerisParser.parseHeader();
+							}
+							if (anerisParser.expectingPayload()) {
+								rcvdMsg = anerisParser.parseMessage();
+							}
 
-							if (slot >= slotNextMsg) {
-								LinkedList<AnerisMessage> anerisMsg = AnerisMessage.parseString(rcvdMsg, slot,
-									ANERIS_TYPE);
-
-								if (DELIVERED_MSG_BUFF.putIfAbsent(slot, anerisMsg) == null) {
-
-									if (slot == slotNextMsg) {
-										slotNextMsg++;
-
-										try {
-											DELIVERED_MSG_LOCK.lock();
-											DELIVERED_MSG_COND.signalAll();
-										} finally {
-											DELIVERED_MSG_LOCK.unlock();
+							if (rcvdMsg != null) {
+								/**
+								 * Since it is enough to receive each command from only one replica, we first parse
+								 * the slot number to avoid parsing the message multiple times.
+								 */
+								long slot = AnerisMessage.parseSlot(rcvdMsg, ANERIS_TYPE);
+	
+								if (slot >= slotNextMsg) {
+									LinkedList<AnerisMessage> anerisMsg = AnerisMessage.parseString(rcvdMsg, slot,
+										ANERIS_TYPE);
+	
+									if (DELIVERED_MSG_BUFF.putIfAbsent(slot, anerisMsg) == null) {
+	
+										if (slot == slotNextMsg) {
+											slotNextMsg++;
+	
+											try {
+												DELIVERED_MSG_LOCK.lock();
+												DELIVERED_MSG_COND.signalAll();
+											} finally {
+												DELIVERED_MSG_LOCK.unlock();
+											}
 										}
 									}
 								}

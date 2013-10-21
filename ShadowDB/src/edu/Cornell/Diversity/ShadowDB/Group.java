@@ -238,7 +238,7 @@ public class Group extends Thread {
 		}
 	}
 
-	public Object receiveFromPrimary() throws SuspectedCrashException, InterruptedException {
+	public Object receiveFromPrimary() throws Exception {
 		if (socketPrimary != null) {
 			return socketPrimary.readObject();
 		} else {
@@ -546,7 +546,9 @@ public class Group extends Thread {
 
 					registeredDb.gcTransactions(now);
 				} catch (Exception e) {
+					e.printStackTrace();
 					if (e instanceof SuspectedCrashException) {
+
 						SuspectedCrashException sce = (SuspectedCrashException) e;
 						LOG.info("\n Detected crash of: " + sce.getId());
 
@@ -654,6 +656,8 @@ public class Group extends Thread {
 					 */
 					registeredDb.gcTransactions(now);
 				} catch (Exception e) {
+					e.printStackTrace();
+
 					if (e instanceof SuspectedCrashException) {
 						SuspectedCrashException sce = (SuspectedCrashException) e;
 						LOG.info("\n Detected crash of: " + sce.getId() + "\n");

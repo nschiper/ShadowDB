@@ -50,7 +50,7 @@ public class TransactionId implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
-	public static final TransactionId NONE = new TransactionId("none", -1, -1);
+	public static transient final TransactionId NONE = new TransactionId("none", -1, -1);
 
 	private String ip;
 	private long threadId;

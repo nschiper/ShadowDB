@@ -38,8 +38,8 @@
 
 package edu.Cornell.Diversity.ResilientTCP;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
@@ -53,6 +53,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 import edu.Cornell.Diversity.ShadowDB.ShadowDBConfig;
+import edu.Cornell.Diversity.Utils.MessageParser;
 import edu.Cornell.Diversity.Utils.NIOUtils;
 
 /**
@@ -86,8 +87,6 @@ public class FailFastSocket extends Thread {
 	 */
 	private static final int DEFAULT_RETRY_COUNT = 30;
 
-	private static final long HEARTBEAT_HEADER = -1;
-
 	private final SocketChannel socketChannel;
 
 	/**
@@ -98,7 +97,17 @@ public class FailFastSocket extends Thread {
 	private Pipe sendPipe;
 	private Pipe rcvPipe;
 
-	private Selector selector;
+	/**
+	 * The selector used in the run() method.
+	 */
+	private Selector mainSelector;
+
+	/**
+	 * The selector used in the readObject() method.
+	 */
+	private Selector readObjSelector;
+
+	private SelectionKey rcvPipeKey;
 
 	/**
 	 * Id of the end point we are connected to.
@@ -120,9 +129,19 @@ public class FailFastSocket extends Thread {
 	private ByteBuffer crashSuspicion;
 
 	/**
-	 * A preallocated byte buffer used to read and write from/to channels.
+	 * A byte buffer to carry out transfers over NIO channels.
 	 */
 	private ByteBuffer byteBuffer;
+
+	/**
+	 * An object used to serialize messages.
+	 */
+	private ByteArrayOutputStream baos;
+
+	/**
+	 * An object used to parse messages received from the rcvPipe.
+	 */
+	private MessageParser rcvPipeParser;
 
 	private void initObject(String localId, String remoteId) throws Exception {
 		this.sendPipe = Pipe.open();
@@ -130,21 +149,23 @@ public class FailFastSocket extends Thread {
 		this.rcvPipe = Pipe.open();
 		this.rcvPipe.source().configureBlocking(false);
 
-		this.selector = Selector.open();
+		this.mainSelector = Selector.open();
+
+		this.readObjSelector = Selector.open();
+		this.rcvPipeKey = this.rcvPipe.source().register(readObjSelector, SelectionKey.OP_READ);
 
 		this.endPointCrashed = new AtomicBoolean(false);
+		this.crashSuspicion = ByteBuffer.allocate(NIOUtils.BYTE_COUNT_INT);
+		this.crashSuspicion.putInt(MessageParser.SUSPICION);
 
-		EndPointCrashSuspicion crashSusipicion = new EndPointCrashSuspicion();
-		this.crashSuspicion = ByteBuffer.allocate(NIOUtils.serializeObject(crashSusipicion).length);
-
-		NIOUtils.serializeObject(crashSusipicion, crashSuspicion, false /* markEndOfHeader */);
-
-		this.byteBuffer = ByteBuffer.allocate(ShadowDBConfig.getMaxMsgSize());			
+		this.rcvPipeParser = new MessageParser(rcvPipe.source());
 
 		/**
 		 * Send our id.
 		 */
-		NIOUtils.writeToChannel(this.socketChannel, localId, byteBuffer);
+		this.byteBuffer = ByteBuffer.allocate(ShadowDBConfig.getMaxMsgSize());
+		this.baos = new ByteArrayOutputStream();
+		NIOUtils.writeToChannel(this.socketChannel, localId, byteBuffer, baos);
 		this.endPointId = null;
 
 		/**
@@ -249,12 +270,14 @@ public class FailFastSocket extends Thread {
 
 	public void run() {
 		try {
-			ByteBuffer heartBeat = ByteBuffer.allocate(NIOUtils.BYTE_COUNT_LONG).putLong(HEARTBEAT_HEADER);
-			ByteBuffer msgBuffer = ByteBuffer.allocate(ShadowDBConfig.getMaxMsgSize());
+			ByteBuffer heartBeat = ByteBuffer.allocate(NIOUtils.BYTE_COUNT_INT).putInt(MessageParser.HEARTBEAT_HEADER);
+			MessageParser pipeParser = new MessageParser(sendPipe.source(), socketChannel);
+			MessageParser socketParser = new MessageParser(socketChannel, rcvPipe.sink());
 
 			Selector selector = Selector.open();
 			SelectionKey socketKey = socketChannel.register(selector, SelectionKey.OP_READ);
 			SelectionKey pipeKey = sendPipe.source().register(selector, SelectionKey.OP_READ);
+			int msgHeader;
 
 			long lastRcvdMsgTS = System.currentTimeMillis();
 			long lastSentMsgTS = 0;
@@ -270,6 +293,7 @@ public class FailFastSocket extends Thread {
 
 				// Suspect the end point to have crashed?
 				if (lastRcvdMsgTS <= (now - ShadowDBConfig.getHeartBeatTimeout())) {
+					System.out.println(System.currentTimeMillis() + " suspected " + endPointId + " because of timeout");
 					notifyCrash();
 					continue;
 				}
@@ -283,41 +307,47 @@ public class FailFastSocket extends Thread {
 					Iterator<SelectionKey> it = selector.selectedKeys().iterator();
 
 					while (it.hasNext()) {
-						boolean transferOK = true;
-						long header = 0;
-
 						SelectionKey key = it.next();
 						it.remove();
- 
-						if (!key.isValid()) {
-							continue;
-						}
 
 						if (key.equals(pipeKey) && key.isReadable()) {
-							lastSentMsgTS = now;
-							header = NIOUtils.readHeader(sendPipe.source(), msgBuffer);
-
-							if (header != NIOUtils.ERROR_HEADER_LONG) {
-								transferOK = NIOUtils.transferData(header, sendPipe.source(), socketChannel, msgBuffer);
+							if (!pipeParser.expectingPayload()) {
+								pipeParser.parseHeader();
 							}
-						} else if (key.equals(socketKey) && key.isReadable()) {
-							lastRcvdMsgTS = now;
-							header = NIOUtils.readHeader(socketChannel, msgBuffer);
 
-							if (header != HEARTBEAT_HEADER && header != NIOUtils.ERROR_HEADER_LONG) {
-								transferOK = NIOUtils.transferData(header, socketChannel, rcvPipe.sink(), msgBuffer);
-								synchronized(rcvPipe.sink()) {
-									rcvPipe.sink().notify();
+							if (pipeParser.expectingPayload()) {
+								boolean transferComplete = pipeParser.transferMessage();
+								if (transferComplete) {
+									lastSentMsgTS = now;
 								}
 							}
+						} else if (key.equals(socketKey) && key.isReadable()) {
+							if (!socketParser.expectingPayload()) {
+								msgHeader = socketParser.parseHeader();
+
+								if (MessageParser.headerValid(msgHeader)) {
+									lastRcvdMsgTS = now;
+									if (msgHeader == MessageParser.HEARTBEAT_HEADER) {
+										System.out.println(System.currentTimeMillis() + " received msg from: " + endPointId);
+									}
+								}
+							}
+							if (socketParser.expectingPayload()) {
+								socketParser.transferMessage();
+							}
 						}
-						if (header == NIOUtils.ERROR_HEADER_LONG || !transferOK) {
+						if (pipeParser.endPointSuspected() || socketParser.endPointSuspected()) {
+							System.out.println(System.currentTimeMillis() + " suspected " + endPointId + " because read -1");
+
 							notifyCrash();
 						}
 					}
 				}
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println(System.currentTimeMillis() + " suspected " + endPointId + " because of exception");
+
 			/**
 			 * If any exception is raised, we consider the other end to have crashed.
 			 */
@@ -329,14 +359,9 @@ public class FailFastSocket extends Thread {
 		endPointCrashed.set(true);
 
 		try {
-			crashSuspicion.rewind();
 			NIOUtils.writeToChannel(rcvPipe.sink(), crashSuspicion);
 		} catch (IOException ioe) {
 			// There's not much we can do here...
-		}
-
-		synchronized(rcvPipe.sink()) {
-			rcvPipe.sink().notify();
 		}
 	}
 
@@ -347,27 +372,36 @@ public class FailFastSocket extends Thread {
 	 * @throws SuspectedCrashException if the process this socket is connected to
 	 *         is suspected of having crashed.
 	 */
-	public Object readObject() throws SuspectedCrashException {
+	public Object readObject() throws Exception {
 		Object msg = null;
 
-		do {
-			try {
-				synchronized (rcvPipe.sink()) {
-					msg = NIOUtils.readObjFromChannel(rcvPipe.source(), byteBuffer, endPointCrashed);
-					if (msg == null) {
-						rcvPipe.sink().wait();
-					}
-				}
-			} catch (Exception e) {
-				LOG.warning("Exception: " + e + " caught while receiving object: " +
-					" sent from: " + endPointId);
-			}
-		} while (msg == null && !endPointCrashed.get());
+        do {
+        	int keysSelected = readObjSelector.select();
 
-		if (endPointCrashed.get()) {
-			throw new SuspectedCrashException(endPointId);
-		}
-		return msg;
+        	if (keysSelected > 0) {
+        		Iterator<SelectionKey> it = readObjSelector.selectedKeys().iterator();
+
+        		while (it.hasNext()) {
+        			SelectionKey key = it.next();
+        			it.remove();
+
+        			if (key.equals(rcvPipeKey) && rcvPipeKey.isReadable()) {
+        				if (!rcvPipeParser.expectingPayload()) {
+        					rcvPipeParser.parseHeader();
+        				}
+        				if (rcvPipeParser.expectingPayload()) {
+        					msg = rcvPipeParser.parseMessage();
+        				}
+        			}
+        		}
+        		System.out.println("Parsed message: " + msg);
+        		if (rcvPipeParser.endPointSuspected()) {
+            		throw new SuspectedCrashException(endPointId);
+            	}
+        	}
+        } while (msg == null);
+
+        return msg;
 	}
 
 	/**
@@ -381,9 +415,9 @@ public class FailFastSocket extends Thread {
 		if (endPointCrashed.get()) {
 			throw new SuspectedCrashException(endPointId);
 		}
-		
+
 		try {
-			if (!NIOUtils.writeToChannel(sendPipe.sink(), obj, byteBuffer)) {
+			if (!NIOUtils.writeToChannel(sendPipe.sink(), obj, byteBuffer, baos)) {
 				LOG.severe("Sending too large objects, max size: " + ShadowDBConfig.getMaxMsgSize());
 			}
 		} catch (Exception e) {
@@ -401,7 +435,7 @@ public class FailFastSocket extends Thread {
 		 * This stops the thread.
 		 */
 		endPointCrashed.set(true);
-		selector.wakeup();
+		mainSelector.wakeup();
 
 		socketChannel.close();
 		rcvPipe.sink().close();
@@ -420,14 +454,6 @@ public class FailFastSocket extends Thread {
 	 */
 	public SelectionKey register(Selector selector, int operations) throws ClosedChannelException {
 		return rcvPipe.source().register(selector, operations);
-	}
-
-	/**
-	 * A dummy class that is sent through the rcvPipe to notify the suspicion
-	 * of the crash of process the socket is connected to.
-	 */
-	private static class EndPointCrashSuspicion implements Serializable {
-		private static final long serialVersionUID = 1L;
 	}
 
 	public String getRemoteAddress() {

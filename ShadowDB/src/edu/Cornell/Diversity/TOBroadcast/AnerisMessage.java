@@ -64,7 +64,7 @@ public class AnerisMessage {
 	private static Pattern INTEGER_PATTERN = Pattern.compile("\\#(\\d+)\\#");
 	private static Pattern PORT_PATTERN = Pattern.compile("\\-(\\d+)\\#");
 	private static Pattern IP_PATTERN = Pattern.compile("\\-(\\d+\\-\\d+\\-\\d+\\-\\d+)\\-");
-	private static Pattern NATURAL_NUMBER_PATTERN = Pattern.compile("natural_number:OPID,\\d+:n");
+	private static Pattern NATURAL_NUMBER_PATTERN = Pattern.compile("natural_number:,\\d+:n");
 
 	/**
 	 * This is used to generate unique identifiers for broadcast messages.
@@ -287,7 +287,7 @@ public class AnerisMessage {
 	public static long parseSlot(String msg, AnerisType anerisType) {
 		long index;
 
-		if (anerisType == AnerisType.INTERPRETED) {
+		if (anerisType.equals(AnerisType.INTERPRETED)) {
 			Matcher indexMatcher = NATURAL_NUMBER_PATTERN.matcher(msg);
 			while(indexMatcher.find()) {
 				Scanner scanner = new Scanner(indexMatcher.group()).useDelimiter("\\p{Punct}");
@@ -301,7 +301,7 @@ public class AnerisMessage {
 					return index;
 				}
 			}
-		} else if (anerisType == AnerisType.LISP) {
+		} else if (anerisType.equals(AnerisType.LISP)) {
 			Scanner scanner = new Scanner(msg);
 			while (scanner.hasNext()) {
 				if (scanner.hasNextLong()) {
@@ -388,10 +388,10 @@ public class AnerisMessage {
 	 */
 	public static LinkedList<AnerisMessage> parseString(String msg, long slot, AnerisType anerisType) {
 
-		if (anerisType == AnerisType.INTERPRETED) {
+		if (anerisType.equals(AnerisType.INTERPRETED)) {
 			return parseStringInterpreted(msg, slot);
 
-		} else if (anerisType == AnerisType.LISP) {
+		} else if (anerisType.equals(AnerisType.LISP)) {
 			return parseStringLisp(msg, slot);
 
 		} else {
@@ -404,7 +404,7 @@ public class AnerisMessage {
 	 * the object.
 	 */
 	public String toNuprlString(AnerisType type) {
-		if (type == AnerisType.INTERPRETED) {
+		if (type.equals(AnerisType.INTERPRETED)) {
 			return String.format(ANERIS_SEND_MSG_FORMAT, msgType.toString(), uid, nuprlProposal());
 		} else {
 			return String.format(ANERIS_LISP_SEND_MSG_FORMAT, msgType.toString(), uid, nuprlProposal());
@@ -412,7 +412,7 @@ public class AnerisMessage {
 	}
 
 	public static String toNuprlString(AnerisType type, ANERIS_MSG_TYPE msgType, long commandId, String nuprlProposal) {
-		if (type == AnerisType.INTERPRETED) {
+		if (type.equals(AnerisType.INTERPRETED)) {
 			return String.format(ANERIS_SEND_MSG_FORMAT, msgType, commandId, nuprlProposal);
 		} else {
 			return String.format(ANERIS_LISP_SEND_MSG_FORMAT, msgType, commandId, nuprlProposal);

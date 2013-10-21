@@ -110,7 +110,7 @@ public class ShadowDBConfig {
 	 *  the new configuration. This is to make sure that they all
 	 *  delivered the new configuration.
 	 */
-	private static final int DEFAULT_GROUP_RECONFIGURATION_TIME = 10000;
+	private static final int DEFAULT_GROUP_RECONFIGURATION_TIME = 2 * DEFAULT_HEARBEAT_TIMEOUT;
 
 	public static int getGroupReconfigurationTime() {
 		if (System.getProperty("groupReconfigurationTime") != null) {

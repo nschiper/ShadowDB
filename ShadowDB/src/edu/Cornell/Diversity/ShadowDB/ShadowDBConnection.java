@@ -102,7 +102,7 @@ public class ShadowDBConnection implements DBConnection {
 						primarySocket.close();
 					}
 					// Give some time for the new primary to be elected
-					Thread.sleep(ShadowDBConfig.getGroupReconfigurationTime());
+					Thread.sleep(2 * ShadowDBConfig.getGroupReconfigurationTime());
 				} catch (Exception e) {
 					// Do nothing...
 				}
