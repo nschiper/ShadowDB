@@ -99,6 +99,11 @@ public class Group extends Thread {
 	 */
 	private LinkedList<IdIpPort> members;
 
+	/**
+	 * The set of backup identifiers.
+	 */
+	private HashSet<String> backupIds;
+
 	private FailFastSocket socketPrimary;
 
 	/**
@@ -154,13 +159,19 @@ public class Group extends Thread {
 		this.registeredDb = dbServer;
 		this.allDbs = dbServers;
 		this.members = new LinkedList<IdIpPort>();
+		this.backupIds = new HashSet<String>();
 
 		this.f = ShadowDBConfig.getF();
 
-		// The first group members are the first f+1 in the configuration file.
+		// The group members are the first f+1 databases in the configuration file.
 		for (int i = 0; i < f + 1; i++) {
 			this.members.add(allDbs.get(i));
+			
+			if (i >= 1) {
+				this.backupIds.add(allDbs.get(i).getId());
+			}
 		}
+
 		this.nextDbToUse = f + 1;
 
 		this.socketMembers = new HashMap<String, FailFastSocket>();
@@ -219,6 +230,10 @@ public class Group extends Thread {
 
 	public int getGroupSize() {
 		return f + 1;
+	}
+
+	public HashSet<String> getBackupIds() {
+		return backupIds;
 	}
 
 	public int getIncarnation() {
@@ -306,6 +321,11 @@ public class Group extends Thread {
 
 		this.members = newConfig.getMembers();
 		this.primary = members.get(0);
+
+		this.backupIds.clear();
+		for (int i = 1; i < members.size(); i++) {
+			this.backupIds.add(members.get(i).getId());
+		}
 
 		incarnation++;
 
