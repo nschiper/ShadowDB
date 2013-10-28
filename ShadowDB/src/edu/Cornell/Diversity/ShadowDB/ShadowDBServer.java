@@ -257,18 +257,26 @@ public class ShadowDBServer {
 
 	public void onMsgFromBackup(FailFastSocket backupSocket, long now) throws Exception {
 		TransactionId id = (TransactionId) backupSocket.readObject();
+		TransactionId firstId;
 
-		if (!acks.containsKey(id)) {
-			acks.put(id, new HashSet<String>());
-		} else if (acks.get(id).contains(backupSocket.getEndPointId())) {
+		if (id instanceof BatchId) {
+			// Batch ids are identified by the first id
+			firstId = ((BatchId) id).getIds().getFirst();
+		} else {
+			firstId = id;
+		}
+
+		if (!acks.containsKey(firstId)) {
+			acks.put(firstId, new HashSet<String>());
+		} else if (acks.get(firstId).contains(backupSocket.getEndPointId())) {
 			LOG.warning(dbIdToString() + " already received acknowledgment from "
-				+ backupSocket.getEndPointId() + " for id " + id);
+				+ backupSocket.getEndPointId() + " for id " + firstId);
 			return;
 		}
 
-		acks.get(id).add(backupSocket.getEndPointId());
+		acks.get(firstId).add(backupSocket.getEndPointId());
 
-		if (acks.get(id).size() == (group.getGroupSize() - 1)) {
+		if (acks.get(firstId).size() == (group.getGroupSize() - 1)) {
 			LinkedList<TransactionId> transIds;
 
 			if (id instanceof BatchId) {
