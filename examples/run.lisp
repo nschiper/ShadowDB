@@ -1,3 +1,33 @@
+;; Copyright 2011 Cornell University
+;; Copyright 2012 Cornell University
+;; Copyright 2013 Cornell University
+;;
+;;
+;; This file is part of EventML - a tool aiming at specifying
+;; distributed protocols in an ML like language.  It is an interface
+;; to the logic of events and is compiled into Nuprl.  It is written
+;; by the NUPRL group of Cornell University, Ithaca, NY.
+;;
+;; EventML is a free software: you can redistribute it and/or modify it
+;; under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; EventML is distributed in the hope that it will be useful, but
+;; WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+;; General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with EventML.  If not, see <http://www.gnu.org/licenses/>.
+;;
+;;  o Authors:     Vincent Rahli
+;;  o Affiliation: Cornell University, NUPRL group
+;;  o Date:        10 May 2013
+;;  o File name:   run.lisp
+;;  o Description: Lisp environment for Nuprl processes
+
+
 ;;;;;; LOAD THE PRELUDE
 
 (load "prelude.lisp")
@@ -12,6 +42,8 @@
 ;;    o then: (ql:quickload "cl-lex")
 ;;    o then: (ql:quickload "yacc")
 ;;    o then: (ql:quickload "marshal")
+;;    o then: (ql:quickload "ironclad")
+;;    o then: (ql:quickload "flexi-streams")
 ;;    o then: (ql:add-to-init-file)
 ;;
 
@@ -19,17 +51,53 @@
 (require :cl-lex)
 (require :marshal)
 (require :yacc)
+(require :ironclad)
+(require :flexi-streams)
+
+;;(load "yacc.fasl")
+;;(use-package '#:yacc)
+;;(load "packages.lisp")
+;;(load "lex.lisp")
+;;(use-package :cl-lex)
+
+;;(defun main () nil)
+
+
+;;;; --------- SWITCHES ---------
 
 ;; true to use the stream read/write and false to use the socket send/receive
 (defvar new-send-receive nil)
+
 ;; true to get the client to log its inputs
 (defvar eml-debug nil)
+
 ;; true to get a move call-by-name-ish program
 ;; The spec also has to change in run-lisp.sh
+;;
+;; This should be used according to the way the Lisp spec file has
+;; been generated (see the comments containing "call-by-name" in
+;; NuprlTerms.sml).
 (defvar cbn t)
 
+;; Delayed Message Handler (dmh) has to be true to use that
+;; functionality which is that we create a process that handles
+;; delayed messages right from the start instead of creating new
+;; threads each time we have to send a new delayed message.
+(defvar dmh t)
+
+
+;; The 'auth' variable has to be true to sign and verify messages.
+(defvar auth nil)
+
+
+;;;; --------- VARIABLES ---------
 
 (defvar nuprl-msgs nil)
+(defvar delayed-nuprl-msgs nil)
+
+;; public and private keys are of type (VECTOR (UNSIGNED-BYTE 8))
+(defvar pbkey nil)
+(defvar prkey nil)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -357,27 +425,27 @@
   (lambda (list1)
     (lambda (list2)
       (let ((list1 (mk-call list1))
-            (list2 (mk-call list2)))
-        (if (pair-p list1)
-            (band (2-nuprl-bool (pair-p list2))
-                  (band (funcall (funcall eq
-                                          (pair-fst list1))
-                                 (pair-fst list2))
-                        (funcall (funcall (list-deq eq)
-                                          (mk-arg (pair-snd list1)))
-                                 (mk-arg (pair-snd list2)))
-                        )
-                  )
-            (if (axiom-p list1)
-                (2-nuprl-bool (axiom-p list2))
-                (progn
-                  (print (format nil "list1: ~A" list1))
-                  (print (format nil "list1: ~A" list2))
-                  (error "1st list is not a list")
-                  )
-                )
-            )
-        )
+	    (list2 (mk-call list2)))
+	(if (pair-p list1)
+	    (band (2-nuprl-bool (pair-p list2))
+		  (band (funcall (funcall eq
+					  (pair-fst list1))
+				 (pair-fst list2))
+			(funcall (funcall (list-deq eq)
+					  (mk-arg (pair-snd list1)))
+				 (mk-arg (pair-snd list2)))
+			)
+		  )
+	    (if (axiom-p list1)
+		(2-nuprl-bool (axiom-p list2))
+		(progn
+		  (print (format nil "list1: ~A" list1))
+		  (print (format nil "list1: ~A" list2))
+		  (error "1st list is not a list")
+		  )
+		)
+	    )
+	)
       )
     )
   )
@@ -556,7 +624,7 @@
   (defun parse-eqdec-1 (speqdec id)
     (if (string= id "List")
 	(list-deq speqdec)
-	(error "parse-typ-1:unexpected type")
+	(error "parse-eqdec-1:unexpected type")
 	)
     )
 
@@ -940,10 +1008,39 @@
   )
 
 (defun test-parser (param loc)
-  (let* ((conf   (parse-conf-file "conf_paxos.emlc"))
+  (let* ((conf   (parse-conf-file "conf_aneris_batching.emlc"))
 	 (params (conf-parameters conf))
 	 (param  (find-param param params)))
-    (funcall (parameter-value param) loc)
+    (funcall (parameter-value param) (mk-arg loc))
+    )
+  )
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;      SIGNATURES
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; Uses DSA
+
+;; Uses private-key 'prkey' to sign message
+(defun mk-sign (message)
+  ;; returns a signature
+  (ironclad:sign-message prkey message)
+  )
+
+;; Uses public-key 'pbkey' to verify message
+(defun verify (message signature)
+  ;; returns a Boolean
+  (ironclad:verify-signature pbkey message signature)
+  )
+
+(defun print-public-key (key)
+  (let ((p (ironclad:dsa-key-p key))
+	(q (ironclad:dsa-key-q key))
+	(g (ironclad:dsa-key-g key))
+	(y (ironclad:dsa-key-y key)))
+    (flexi-streams:octets-to-string (cons p (cons q (cons g (cons y nil)))) :external-format :utf-8)
     )
   )
 
@@ -978,10 +1075,12 @@
 ;; 'loc' is the location that creates the server and 'ip' its ip
 (defun create-server-socket (loc ip port)
   (print-eml-loc loc "creating server socket")
-  (let ((socket (new-socket)))
+  (let ((socket (new-socket))
+	(addr (sb-bsd-sockets:make-inet-address ip)))
     (setf (sb-bsd-sockets:sockopt-reuse-address socket) t)
-    (print-eml-loc loc "binding")
-    (sb-bsd-sockets:socket-bind socket (sb-bsd-sockets:make-inet-address ip) port)
+    (print-eml-loc loc (format nil "binding[~A;~A;~A]..." ip addr port))
+    (sb-bsd-sockets:socket-bind socket addr port)
+    (print-eml-loc loc "binding done")
     (print-eml-loc loc "listening")
     (sb-bsd-sockets:socket-listen socket 100)
     socket
@@ -1277,14 +1376,34 @@
       )
   )
 
+(defun send-public-key1 (loc socket desc stream)
+  ;; !! WON'T WORK, pbkey is not a string
+  (let ((str (concatenate 'string pbkey "!")))
+    (print-eml-loc loc (concatenate 'string "--sending public key " str))
+    (send-something loc socket desc stream str)
+    )
+  )
+
+(defun send-public-key2 (loc socket desc stream)
+  (print-eml-loc loc (format nil "--sending public key ~A" pbkey))
+  (send-something loc socket desc stream pbkey)
+  )
+
+(defun send-public-key (loc socket desc stream)
+  (if new-send-receive
+      (send-public-key2 loc socket desc stream)
+      (send-public-key1 loc socket desc stream)
+      )
+  )
+
 (defun connect (loc socket host port)
-  (print-eml-loc loc (format nil "----connecting to host and port ~A ~A" host port))
   (handler-case
       (sb-bsd-sockets:socket-connect socket (sb-bsd-sockets:make-inet-address host) port)
     (sb-bsd-sockets:connection-refused-error
 	(c)
       (declare (ignore c))
       (print-eml-loc loc "connection failed, will retry in 1 seconds")
+      ;; sleep for 1s
       (sleep 1)
       (connect loc socket host port)))
   )
@@ -1297,6 +1416,10 @@
   (sb-bsd-sockets:socket-make-stream socket :input t :output t :serve-events t);; :buffering :none)
   )
 
+;; 'loc' connects to the list of locations 'gt', and make itself known
+;; by sending its port number.  The locatios in 'gt' can find out who
+;; the incoming connection request is by looking at the received port
+;; number and checking it against the configuration file.
 (defun connect-to (loc port gt)
   (print-eml-loc loc (format nil "~A machine(s) to connect to" (list-length gt)))
   (if gt
@@ -1317,6 +1440,10 @@
 	(connect loc socket h p)
 	;; send port number to host using socket
 	(send-port-number loc port socket desc stream)
+	;; if 'auth' is true 'loc' also send public key
+	(if auth
+	    (send-public-key loc socket desc stream)
+	    )
 	;; returns the updated nfo
 	(cons nfo (connect-to loc port (cdr gt)))
 	)
@@ -1499,16 +1626,14 @@
 
 (defun boot-up-prog (loc conf spec)
   (print-eml-loc loc "loading program")
-  (print-eml-loc loc "getting parameters")
   (let ((parameters (conf-parameters conf)))
     ;;(print-eml-loc loc (format nil "parameters: ~A" parameters))
     ;;(load spec-file)
-    (print-eml-loc loc "applying parameters")
     (let ((program (reduce (lambda (prg param)
 			     (funcall prg (mk-arg (parameter-value param))))
 			   parameters
 			   :initial-value (funcall spec))))
-      (print-eml-loc loc "applying location")
+      (print-eml-loc loc "applied parameters")
       (funcall program (mk-arg loc))
       )
     )
@@ -1537,14 +1662,19 @@
 	  (multiple-value-bind (buf len peer)
 	      (gen-receive loc socket desc stream n)
 	    (declare (ignore peer))
-	    ;; TO COMMENT 2
-	    ;;(print-eml-loc loc (format nil "--received ~A bytes from ~A" len peer))
-	    (receive-one-message-len-aux loc
-					 (- n len)
-					 (concatenate 'string str buf)
-					 socket
-					 desc
-					 stream)
+	    (let ((nbuf (subseq buf 0 len)))
+	      ;; TO COMMENT 2
+	      ;;(print-eml-loc loc (format nil "--received ~A bytes from ~A (~A)" len peer (length nbuf)))
+	      ;;(if (not (string= str ""))
+	      ;;  (print-eml-loc loc (format nil "tail(~A): ~A" (length nbuf) nbuf))
+	      ;;)
+	      (receive-one-message-len-aux loc
+					   (- n len)
+					   (concatenate 'string str nbuf)
+					   socket
+					   desc
+					   stream)
+	      )
 	    )
 	  )
       )
@@ -1555,9 +1685,11 @@
 ;;  (2) then we read the message itself, by reading n bytes
 (defun receive-one-message-len (loc socket desc stream)
   (let ((n (receive-integer loc socket desc stream)))
+    ;; TO COMMENT 2
+    ;;(print-eml-loc loc (format nil "ready to receive ~A bytes" n))
     (let ((str (receive-one-message-len-aux loc n "" socket desc stream)))
       ;; TO COMMENT
-      ;; (print-eml-loc loc (format nil "received: ~A" str))
+      ;;(print-eml-loc loc (format nil "received: ~A" str))
       str
       )
     )
@@ -1566,7 +1698,18 @@
 (defun receive-one-message-len-parse1 (b loc socket desc stream)
   ;; we use read-from-string to deserialize/unmarshal a structure
   (if b
-      (read-from-string (receive-one-message-len loc socket desc stream))
+      (let ((str (receive-one-message-len loc socket desc stream)))
+	(handler-case
+	    ;;(read-from-string str) ;; Error on big strings?
+	    (read (make-string-input-stream str))
+	  (error (c)
+	    ;;(print-eml-loc loc (format nil "error while reading string ~A" str))
+	    (print-eml-loc loc (format nil "error while reading string"))
+	    (print-eml-loc loc "propagating the error")
+	    (error c)
+	    )
+	  )
+	)
       ;;(ms:unmarshal (receive-one-message-len loc socket desc stream))
       (receive-one-message-len loc socket desc stream)
       )
@@ -1593,18 +1736,39 @@
   ;;(send-something loc socket desc stream "!")
   )
 
-(defun send-message (loc socket desc stream msg delay)
+;; This is the old send-message function that was using fork when
+;; the sending has to be delayed.  The new function uses threads.
+(defun send-message-xxx (loc socket desc stream msg delay)
   (if (and delay (> delay 0))
       (let ((n (sb-posix:fork)))
 	(if (= n 0)
 	    (progn ;; the child sends the message
-	      (sleep delay)
+	      (sleep (float (/ delay 1000)))
 	      (send-message-aux loc socket desc stream msg)
 	      ;;(sb-ext:exit)
-	      (quit)
+	      (sb-ext:exit)
 	      )
 	    (print-eml-loc loc "child is going to send the delayed message")
 	    )
+	)
+      (progn
+	(send-message-aux loc socket desc stream msg)
+	()
+	)
+      )
+  )
+
+(defun send-message (loc socket desc stream msg delay)
+  (if (and delay (> delay 0))
+      (progn
+	(print-eml-loc loc (format nil "new thread is going to send the delayed message (~A ms)" delay))
+	(sb-thread:make-thread
+	 (lambda ()
+	   (progn
+	     (sleep (float (/ delay 1000)))
+	     (send-message-aux loc socket desc stream msg)
+	     ))
+	 :name "sender")
 	)
       (progn
 	(send-message-aux loc socket desc stream msg)
@@ -1624,17 +1788,19 @@
   (send-something loc socket desc stream str)
   )
 
-(defun send-length-and-message (loc socket desc stream str delay)
+;; This is the old send-length-and-message function, the new one uses
+;; threads instead of fork.
+(defun send-length-and-message-xxx (loc socket desc stream str delay)
   (let* ((len  (length str))
 	 (slen (concatenate 'string (prin1-to-string len) "!")))
     (if (and delay (> delay 0))
 	(let ((n (sb-posix:fork)))
 	  (if (= n 0)
 	      (progn ;; the child sends the message
-		(sleep delay)
+		(sleep (float (/ delay 1000)))
 		(send-length-and-message-aux loc socket desc stream slen str)
 		;;(sb-ext:exit)
-		(quit)
+		(sb-ext:exit)
 		)
 	      (print-eml-loc loc "child is going to send the delayed message")
 	    )
@@ -1647,25 +1813,97 @@
     )
   )
 
-(defun send-length-and-message-format1 (b loc socket desc stream info delay)
-  ;; we use format to serialize/marshal
-  (if b
-      (send-length-and-message loc socket desc stream (format nil "~S" info) delay)
-      ;;(send-length-and-message loc socket desc stream (ms:marshal info) delay)
-      (send-length-and-message loc socket desc stream info delay)
+(defun mk-directed-message (delay loc msg)
+  (make-pair :fst delay :snd (make-pair :fst loc :snd msg))
+  )
+
+(defun send-length-and-message-dmh (loc dest socket desc stream str delay)
+  (if (and delay (> delay 0))
+      ;; If delay > 0 and the delayed message handler is active then
+      ;; we have to send a message to the handler instead of the destination.
+      ;; (This is done by send-output-dmh)
+      ;; The content of the message should be (delay,dest,msg) instead of just msg.
+      (let* ((msg  (format nil "~S" (mk-directed-message delay dest str)))
+	     (len  (length msg))
+	     (slen (concatenate 'string (prin1-to-string len) "!")))
+	(print-eml-loc loc "sending delayed message to delayed message handler")
+	(send-length-and-message-aux loc socket desc stream slen msg)
+	)
+      (let* ((len  (length str))
+	     (slen (concatenate 'string (prin1-to-string len) "!")))
+	(send-length-and-message-aux loc socket desc stream slen str)
+	()
+	)
       )
   )
 
-(defun send-length-and-message-format2 (b loc socket desc stream info delay)
+(defun send-length-and-message-threads (loc dest socket desc stream str delay)
+  (declare (ignore dest))
+  (let* ((len  (length str))
+	 (slen (concatenate 'string (prin1-to-string len) "!")))
+    (if (and delay (> delay 0))
+	(progn
+	  ;;(print-eml-loc loc (format nil "new thread is going to send the delayed message (~A ms)" delay))
+	  (sb-thread:make-thread
+	   (lambda ()
+	     (progn
+	       ;;(print-eml-loc loc "going to sleep")
+	       (sleep (float (/ delay 1000)))
+	       ;;(print-eml-loc loc "waking up")
+	       ;;(print-eml-loc loc "sending message")
+	       (send-length-and-message-aux loc socket desc stream slen str)
+	       ;;(print-eml-loc loc "message sent")
+	       ))
+	   :name "sender")
+	  ;;(print-eml-loc loc "thread is sending message")
+	  ()
+	  )
+	(progn
+	  (send-length-and-message-aux loc socket desc stream slen str)
+	  ()
+	  )
+	)
+    )
+  )
+
+(defun send-length-and-message (loc dest socket desc stream str delay)
+  (handler-case
+      (if dmh
+	  (send-length-and-message-dmh     loc dest socket desc stream str delay)
+	  (send-length-and-message-threads loc dest socket desc stream str delay)
+	  )
+    (error
+	(c)
+      (print-eml-loc loc (format nil "send-length-and-message error: ~A" c))
+      (error c)
+      )
+    )
+  )
+
+(defun send-length-and-message-format1 (b loc dest socket desc stream info delay)
+  ;; we use format to serialize/marshal
+  (if b
+      (send-length-and-message loc dest socket desc stream (format nil "~S" info) delay)
+      ;;(send-length-and-message loc socket desc stream (ms:marshal info) delay)
+      (send-length-and-message loc dest socket desc stream info delay)
+      )
+  )
+
+(defun send-length-and-message-format2 (b loc dest socket desc stream info delay)
   (declare (ignore b))
+  (declare (ignore dest))
   (send-message loc socket desc stream info delay)
   )
 
-(defun send-length-and-message-format (b loc socket desc stream info delay)
-  (if new-send-receive
-      (send-length-and-message-format2 b loc socket desc stream info delay)
-      (send-length-and-message-format1 b loc socket desc stream info delay)
+(defun send-length-and-message-format (b loc dest socket desc stream info delay)
+;;  (print-eml-loc loc (format nil "sending message to ~A" dest))
+;;  (if (string<= "client" dest)
+;;      (send-length-and-message-format1 b loc socket desc stream info delay)
+    (if (and new-send-receive (not dmh))
+	(send-length-and-message-format2 b loc dest socket desc stream info delay)
+      (send-length-and-message-format1 b loc dest socket desc stream info delay)
       )
+;;    )
   )
 
 (defun handle-new-connection (loc outfd stream socket)
@@ -1673,14 +1911,18 @@
   ;;(print-eml-loc loc "new connection handler waiting")
   ;; now we're going to receive messages from socket and
   ;; forward them to outfd
-  (let* ((desc (socket-to-fd socket))
-	 (strm (socket-to-stream socket))
-	 (str  (receive-one-message-len-parse nil loc socket desc strm)))
+  (let* ((desc   (socket-to-fd socket))
+	 (strm   (socket-to-stream socket))
+	 (str    (receive-one-message-len-parse nil loc socket desc strm))
+	 (b      nil)
+	 (sock   nil)
+	 (delay  nil))
     ;; TO COMMENT
     ;;(print-eml-loc loc (format nil "--received message ~A, forwarding it" str))
     ;; TO COMMENT 2
     ;;(print-eml-loc loc "--received message, forwarding it")
-    (send-length-and-message-format nil loc nil outfd stream str nil)
+    ;; The destination is loc because we send a message to ourselves
+    (send-length-and-message-format b loc loc sock outfd stream str delay)
     (handle-new-connection loc outfd stream socket)
     )
   )
@@ -1700,7 +1942,7 @@
 	    )
 	  (print-eml-loc loc "handler stopped")
 	  ;;(sb-ext:exit)
-	  (quit)
+	  (sb-ext:exit)
 	  )
 	(keep-listening-for-inputs loc outfd stream server) ;; parent process
 	;; (make-process "Connection handler"
@@ -1740,6 +1982,12 @@
 	 (port     (location-port location))
 	 (group    (find-group-id loc groups))
 	 (member   (group-member group)))
+    (if auth
+	;; !! CHANGE THESE VALUES
+	(progn (setq pbkey (ironclad:make-public-key :dsa :p 10 :q 10 :g 10 :y 10))
+	       (setq prkey (ironclad:make-public-key :dsa :p 10 :q 10 :g 10 :y 10 :x 10))
+	       )
+	)
     (multiple-value-bind (server nfos)
 	(boot-up-conn loc ip port conf)
       (multiple-value-bind (infd outfd)
@@ -1747,19 +1995,19 @@
 	;;(print-eml-loc loc (format nil "created pipe, in: ~A, out: ~A" infd outfd))
 	(let ((new-nfos (add-fd-to-nfos nfos nil infd))
 	      (n (sb-posix:fork)))
-	  ;; I was trying to use posix-fork, but I'm not sure what it does!
+	  ;; I was trying to use posix-fork instead of sb-posix:fork, but I'm not sure what it does!
 	  (if (= n 0)
 	      (progn ;; new process
-		(print-eml-loc loc "forked listener (child)")
+		(print-eml-loc loc "forked listener (child), listening for inputs")
 		(keep-listening-for-inputs (concatenate 'string loc "-h")
 					   outfd
 					   (fd2stream outfd)
 					   server)
 		)
 	      (progn ;; parent process
-		(print-eml-loc loc (format nil "forked listener (parent,~A)" n))
+		(print-eml-loc loc (format nil "forked listener (parent,~A), running process" n))
 		(let ((program (if member (boot-up-prog loc conf spec) nil)))
-		  (values loc member server new-nfos program)
+		  (values loc member new-nfos program)
 		  )
 		)
 	      )
@@ -1852,6 +2100,10 @@
   (declare (ignore nfos))
   ;; we wait for an event to happen
   (sb-sys:serve-event)
+  ;; (handler-case (sb-sys:serve-event)
+  ;;   (error (c)
+  ;;     (print-eml-loc loc (format nil "an error occurred: ~A" c)))
+  ;;   )
   )
 
 (defun receive-messages (loc nfos)
@@ -1884,6 +2136,17 @@
       )
   )
 
+(defun run-hdf-time (loc program msg)
+  (print-eml-loc loc (format nil "universal time(1): ~A s" (get-universal-time)))
+  (print-eml-loc loc (format nil "real time(1): ~A ms" (get-internal-real-time)))
+  (print-eml-loc loc (format nil "run time(1): ~A ms" (get-internal-run-time)))
+  (let ((ret (run-hdf loc program msg)))
+    (print-eml-loc loc (format nil "universal time(2): ~A s" (get-universal-time)))
+    (print-eml-loc loc (format nil "real time(2): ~A ms" (get-internal-real-time)))
+    (print-eml-loc loc (format nil "run time(2): ~A ms" (get-internal-run-time)))
+    ret)
+  )
+
 (defun nuprl-list-to-lisp (lst)
   (if (pair-p lst)
       (cons (pair-fst lst) (nuprl-list-to-lisp (pair-snd lst)))
@@ -1907,26 +2170,57 @@
   (find id nfos :test #'(lambda (id nfo) (string= id (nfo-id nfo))))
   )
 
-(defun send-output (loc outnfo nfos output)
+(defun send-output-dmh (loc outnfo nfos output)
   (let ((delay (get-delay-of-intransit-message output))
 	(to    (get-loc-of-intransit-message   output))
 	(msg   (get-msg-of-intransit-message   output)))
     ;; TO COMMENT
-    ;; (print-eml-loc loc (format nil "sending msg ~A to ~A" msg to))
+    ;;(print-eml-loc loc (format nil "sending msg ~A to ~A" msg to))
+    (if (and (string= loc to) (= delay 0))
+	;; then we don't send the message through the socket, instead we're going
+	;; to directly apply the program to the message.
+	(cons msg nil)
+	(let ((nfo (if (> delay 0) outnfo (find-nfo-with-id loc to nfos))))
+	  (let ((socket (nfo-socket nfo))
+		(desc   (nfo-desc   nfo))
+		(stream (nfo-stream nfo))
+		(dest   (nfo-id     nfo))) ;; to and dest should be the same
+	    (send-length-and-message-format t loc dest socket desc stream msg delay)
+	    nil
+	    )
+	  )
+	)
+    )
+  )
+
+(defun send-output-threads (loc outnfo nfos output)
+  (let ((delay (get-delay-of-intransit-message output))
+	(to    (get-loc-of-intransit-message   output))
+	(msg   (get-msg-of-intransit-message   output)))
+    ;; TO COMMENT
+    ;;(print-eml-loc loc (format nil "sending msg ~A to ~A" msg to))
     (if (and (string= loc to) (= delay 0))
 	;; then we don't send the message through the socket, instead we're going
 	;; to directly apply the program to the message.
 	(cons msg nil)
 	(let ((nfo (if (string= loc to) outnfo (find-nfo-with-id loc to nfos))))
 	  (let ((socket (nfo-socket nfo))
-		(desc   (nfo-desc nfo))
-		(stream (nfo-stream nfo)))
-	    (send-length-and-message-format t loc socket desc stream msg delay)
+		(desc   (nfo-desc   nfo))
+		(stream (nfo-stream nfo))
+		(dest   (nfo-id     nfo))) ;; to and dest should be the same
+	    (send-length-and-message-format t loc dest socket desc stream msg delay)
 	    nil
 	    )
 	  )
 	)
     )
+  )
+
+(defun send-output (loc outnfo nfos output)
+  (if dmh
+      (send-output-dmh loc outnfo nfos output)
+      (send-output-threads loc outnfo nfos output)
+      )
   )
 
 (defun send-outputs (loc outnfo nfos outputs inmsgs)
@@ -2002,7 +2296,9 @@
     ;; TO COMMENT 2
     ;;(when (zerop (mod n 100))
     (print-eml-loc loc (format nil "received messages ~A" msgs))
-    (print-eml-loc loc (format nil "time: ~A" (get-universal-time)))
+    (print-eml-loc loc (format nil "universal time: ~A s" (get-universal-time)))
+    (print-eml-loc loc (format nil "real time: ~A ms" (get-internal-real-time)))
+    (print-eml-loc loc (format nil "run time: ~A ms" (get-internal-run-time)))
     ;;)
     (when stream
       (write msgs :stream stream)
@@ -2014,9 +2310,9 @@
   )
 
 (defun xxxx-run-distributed-program (ident config spec)
-  (multiple-value-bind (loc member server nfos program)
+  (multiple-value-bind (loc member nfos program)
       (boot-up ident config spec)
-    (declare (ignore server))
+    (print-eml-loc loc "bootup finished")
     (multiple-value-bind (infd outfd)
 	(sb-posix:pipe)
       (let ((new-nfos (add-fd-to-nfos nfos loc infd))
@@ -2045,6 +2341,7 @@
   (if nfos
       ;; we create the handlers
       (let* ((nfo    (car nfos))
+	     (peer   (nfo-id     nfo))
 	     (socket (nfo-socket nfo))
 	     (fd     (nfo-desc   nfo))
 	     (strm   (nfo-stream nfo)))
@@ -2054,9 +2351,21 @@
 	     :input
 	     #'(lambda (x)
 		 (declare (ignore x)) ;; x should be fd
-		 (let ((msgs (receive-one-message-len-parse t loc socket fd strm)))
-		   (setf nuprl-msgs
-			 (append (if (listp msgs) msgs (cons msgs nil)) nuprl-msgs)))))
+		 (handler-case
+		     (let ((msgs (receive-one-message-len-parse t loc socket fd strm)))
+		       (setf nuprl-msgs
+			     (append (if (listp msgs) msgs (cons msgs nil))
+				     nuprl-msgs))
+		       )
+		   (error (c)
+		     (print-eml-loc loc (format nil "error happened while receiving message: ~A" c))
+		     (print-eml-loc loc (format nil "cleaning handler for ~A" peer))
+		     (sb-sys:invalidate-descriptor fd)
+		     (print-eml-loc loc (format nil "handler cleaned for ~A" peer))
+		     )
+		   )
+		 )
+	     )
 	  (set-handlers loc member outnfo (cdr nfos) program allnfos)
 	  )
 	)
@@ -2077,18 +2386,130 @@
       )
   )
 
-(defun run-distributed-program (ident config spec)
-  (multiple-value-bind (loc member server nfos program)
+(defun delayed-message-handler-get-msgs (loc)
+  (declare (ignore loc))
+  ;; Is that serve-event going to clash with the other serve events
+  ;; event though they're now 2 different processes because of the fork?
+  (setf delayed-nuprl-msgs nil)
+  (sb-sys:serve-event)
+  ;;(print-eml-loc loc (format nil "delayed-message-handler served ~A" delayed-nuprl-msgs))
+  delayed-nuprl-msgs
+  )
+
+(defun delayed-message-handler-send-output (loc outnfo nfos output)
+  ;;(print-eml-loc loc "delayed-message-handler sending output")
+  (sb-thread:make-thread
+   (lambda ()
+     (let ((delay (get-delay-of-intransit-message output))
+	   (to    (get-loc-of-intransit-message   output))
+	   (msg   (get-msg-of-intransit-message   output)))
+       (sleep (float (/ delay 1000)))
+       (let ((nfo (if (string= loc to) outnfo (find-nfo-with-id loc to nfos))))
+	 (let ((socket (nfo-socket nfo))
+	       (desc   (nfo-desc   nfo))
+	       (stream (nfo-stream nfo))
+	       (dest   (nfo-id     nfo))
+	       (newdelay nil))
+	   (send-length-and-message-format nil loc dest socket desc stream msg newdelay)
+	   )
+	 )))
+   :name "delayed-mesasge-handler-sender")
+  )
+
+(defun delayed-message-handler-send-outputs (loc outnfo nfos outputs)
+  (if outputs
+      (progn
+	(delayed-message-handler-send-output loc outnfo nfos (car outputs))
+	(delayed-message-handler-send-outputs loc outnfo nfos (cdr outputs))
+	)
+      ()
+      )
+  )
+
+(defun delayed-message-handler-loop (loc outnfo nfos)
+  (let ((msgs (delayed-message-handler-get-msgs loc)))
+    ;;(print-eml-loc loc (format nil "delayed-message-handler got messages ~A" msgs))
+    (delayed-message-handler-send-outputs loc outnfo nfos msgs)
+    (delayed-message-handler-loop loc outnfo nfos)
+    )
+  )
+
+(defun delayed-message-handler (loc infd outnfo nfos)
+  (let ((n (sb-posix:fork)))
+    (if (= n 0)
+	(sb-sys:with-fd-handler
+	    (infd
+	     :input
+	     #'(lambda (x)
+		 (declare (ignore x)) ;; x should be infd
+		 ;;(print-eml-loc loc "delayed-message-handler handling")
+		 (handler-case
+		     (let ((msgs (receive-one-message-len-parse t loc nil infd (fd2stream infd))))
+		       ;;(print-eml-loc loc "delayed-message-handler received")
+		       (setf delayed-nuprl-msgs
+			     (append (if (listp msgs) msgs (cons msgs nil))
+				     delayed-nuprl-msgs))
+		       )
+		   (error (c)
+		     (print-eml-loc loc (format nil "[delayed-message-handler]error happened while receiving message: ~A" c))
+		     (print-eml-loc loc (format nil "[delayed-message-handler]dying"))
+		     (sb-sys:invalidate-descriptor infd)
+		     (print-eml-loc loc (format nil "[delayed-message-handler]died"))
+		     )
+		   )
+		 )
+	     )
+	  (progn
+	    (delayed-message-handler-loop loc outnfo nfos)
+	    (print-eml-loc loc "delayed-message-handler stopped")
+	    (sb-ext:exit)
+	    )
+	  )
+	(print-eml-loc loc "forked a delayed message handler")
+	)
+    )
+  )
+
+(defun run-distributed-program-dmh (ident config spec)
+  (multiple-value-bind (loc member nfos program)
       (boot-up ident config spec)
-    (declare (ignore server))
-    (multiple-value-bind (infd outfd)
+    ;; we create a pipe so that the process can send messages to itself.
+    ;; we only send messages to ourselves when the messages are delayed.
+    (multiple-value-bind (in-fd-handler out-fd-proc)
 	(sb-posix:pipe)
-      (let ((new-nfos (add-fd-to-nfos nfos loc infd))
-	    (outnfo (mk-nfo-from-fd loc outfd)))
+      (multiple-value-bind (in-fd-proc out-fd-handler)
+	  (sb-posix:pipe)
+	(let ((new-nfos        (add-fd-to-nfos nfos loc in-fd-proc))
+	      (out-nfo-proc    (mk-nfo-from-fd loc out-fd-proc))
+	      (out-nfo-handler (mk-nfo-from-fd loc out-fd-handler)))
+	  (delayed-message-handler loc in-fd-handler out-nfo-handler nfos)
+	  (set-handlers loc member out-nfo-proc new-nfos program new-nfos)
+	  )
+	)
+      )
+    )
+  )
+
+(defun run-distributed-program-threads (ident config spec)
+  (multiple-value-bind (loc member nfos program)
+      (boot-up ident config spec)
+    ;; we create a pipe so that the process can send messages to itself.
+    ;; we only send messages to ourselves when the messages are delayed.
+    (multiple-value-bind (in-fd-proc out-fd-proc)
+	(sb-posix:pipe)
+      (let ((new-nfos (add-fd-to-nfos nfos loc in-fd-proc))
+	    (outnfo (mk-nfo-from-fd loc out-fd-proc)))
 	(set-handlers loc member outnfo new-nfos program new-nfos)
 	)
       )
     )
+  )
+
+(defun run-distributed-program (ident config spec)
+  (if dmh
+      (run-distributed-program-dmh ident config spec)
+      (run-distributed-program-threads ident config spec)
+      )
   )
 
 (defun old-mk-msg (hdr typ val)
@@ -2098,10 +2519,6 @@
 (defun mk-msg (hdr typ val)
   (declare (ignore typ))
   (make-pair :fst hdr :snd val)
-  )
-
-(defun mk-directed-message (delay loc msg)
-  (make-pair :fst delay :snd (make-pair :fst loc :snd msg))
   )
 
 (defun mk-propose-msg (n)
@@ -2150,20 +2567,32 @@
   (mk-swap n "paxos")
   )
 
+(defun mk-swap-23 (n)
+  (mk-swap n "2/3")
+  )
+
 (defun mk-swap-paxos-dmsg (loc n)
   (mk-directed-message 0 loc (mk-swap n "paxos"))
   )
 
-(defun run-sender-loop (fmkmsg loc n m socket desc stream)
+(defun mk-swap-23-dmsg (loc n)
+  (mk-directed-message 0 loc (mk-swap n "2/3"))
+  )
+
+(defun run-sender-loop (fmkmsg loc dest n m socket desc stream)
   (if (> n m)
       (print-eml-loc loc "done")
-      (let* ((msg (funcall fmkmsg n)))
+      (let* ((msg   (funcall fmkmsg n))
+	     (delay nil))
 	;; TO COMMENT 2
 	(print-eml-loc loc (format nil "sending ~A" msg))
-	(print-eml-loc loc (format nil "time: ~A" (get-universal-time)))
-	(send-length-and-message-format t loc socket desc stream msg nil)
+	(print-eml-loc loc (format nil "universal time: ~A s" (get-universal-time)))
+	(print-eml-loc loc (format nil "real time: ~A ms" (get-internal-real-time)))
+	(print-eml-loc loc (format nil "run time: ~A ms" (get-internal-run-time)))
+	(send-length-and-message-format t loc dest socket desc stream msg delay)
+	;; sleeps for 1ms
 	(sleep 0.001)
-	(run-sender-loop fmkmsg loc (+ n 1) m socket desc stream)
+	(run-sender-loop fmkmsg loc dest (+ n 1) m socket desc stream)
 	)
       )
   )
@@ -2179,7 +2608,7 @@
     (connect loc socket (location-host location) (location-port location))
     (print-eml-loc loc (format nil "connected to ~A" id))
     ;; then we send proposals from n to m
-    (run-sender-loop fmkmsg loc n m socket desc stream)
+    (run-sender-loop fmkmsg loc id n m socket desc stream)
     )
   )
 
@@ -2187,14 +2616,22 @@
 
 ;;;;;; --------- tests ---------
 
-(defvar aneris-conf "../conf/conf_aneris_local.emlc")
+;; (defvar pax-list "paxos-list.lisp")
+;; (defvar pax-conf "conf_paxos.emlc")
 
+;; (defvar aneris-slow "aneris_slowrep_opt4_2lisp2.lisp")
+;;(defvar aneris-conf "conf_aneris_local.emlc")
+(defvar aneris-conf "../conf/conf_aneris_batching.emlc")
+
+;;(load "paxos-list2.fasl")
 (if cbn
-    (load "aneris_fastrep2_opt4_2lisp3.fasl")
-    (load "aneris_fastrep2_opt4_2lisp2.fasl")
-    )
+    (load "aneris-batching-control2.fasl")
+    ;;(load "aneris_fastrep2_opt4_2lisp3.fasl")
+  (load "aneris_fastrep_opt4_2lisp2.fasl")
+  )
 
 (defvar main-spec #'main)
+;;(defvar conf-file pax-conf)
 (defvar conf-file aneris-conf)
 
 (defun test-boot-up-conn (loc ip port)
@@ -2231,27 +2668,29 @@
 (defun test-bcast   (n m conf-file) (run-sender #'mk-bcast-msg   "xxx" "rep2" n m conf-file))
 (defun test-swap    (n conf-file)   (run-sender #'mk-swap-paxos  "xxx" "rep2" n n conf-file))
 
-;; tests acceptors
-(defun t-acc1 () (test-acc1 conf-file))
-(defun t-acc2 () (test-acc2 conf-file))
-(defun t-acc3 () (test-acc3 conf-file))
-;; tests 2/3 locations
-(defun t-loc1 () (test-loc1 conf-file))
-(defun t-loc2 () (test-loc2 conf-file))
-(defun t-loc3 () (test-loc3 conf-file))
-(defun t-loc4 () (test-loc4 conf-file))
-;; tests leaders
-(defun t-ldr1 () (test-ldr1 conf-file))
-(defun t-ldr2 () (test-ldr2 conf-file))
-;; tests replicas
-(defun t-rep1 () (test-rep1 conf-file))
-(defun t-rep2 () (test-rep2 conf-file))
-;; tests clients
-(defun t-client1 () (test-client1 conf-file))
+
+;; tsts acceptors
+(defun tst-acc1 () (run-distributed-program "acc1" conf-file main-spec))
+(defun tst-acc2 () (run-distributed-program "acc2" conf-file main-spec))
+(defun tst-acc3 () (run-distributed-program "acc3" conf-file main-spec))
+;; tsts 2/3 locations
+(defun tst-loc1 () (run-distributed-program "loc1" conf-file main-spec))
+(defun tst-loc2 () (run-distributed-program "loc2" conf-file main-spec))
+(defun tst-loc3 () (run-distributed-program "loc3" conf-file main-spec))
+(defun tst-loc4 () (run-distributed-program "loc4" conf-file main-spec))
+;; tsts leaders
+(defun tst-ldr1 () (run-distributed-program "ldr1" conf-file main-spec))
+(defun tst-ldr2 () (run-distributed-program "ldr2" conf-file main-spec))
+;; tsts replicas
+(defun tst-rep1 () (run-distributed-program "rep1" conf-file main-spec))
+(defun tst-rep2 () (run-distributed-program "rep2" conf-file main-spec))
+;; tsts clients
+(defun tst-client1 () (run-distributed-program "client1" conf-file main-spec))
 ;; sender
-(defun t-propose (n m) (test-propose n m conf-file))
-(defun t-bcast   (n m) (test-bcast   n m conf-file))
-(defun t-swap    (n)   (test-swap    n   conf-file))
+(defun tst-propose (n m) (run-sender #'mk-propose-msg "xxx" "ldr2" n m conf-file))
+(defun tst-bcast   (n m) (run-sender #'mk-bcast-msg   "xxx" "rep2" n m conf-file))
+(defun tst-swap    (n)   (run-sender #'mk-swap-paxos  "xxx" "rep2" n n conf-file))
+(defun tst-swap23  (n)   (run-sender #'mk-swap-23     "xxx" "rep2" n n conf-file))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
