@@ -30,15 +30,16 @@
 
 %parameters
  Op       : TYPE(Tok List)
- eq_Op    : DEQ(Tok List)
  accpts   : {LOC(acc1);LOC(acc2);LOC(acc3)}
- ldrs     : {LOC(ldr1);LOC(ldr2)}
- ldrs_uid : \loc.if loc = LOC(ldr1) then 1 else 2
- locs     : {LOC(loc1);LOC(loc2);LOC(loc3);LOC(loc4)}
- reps     : {LOC(rep1);LOC(rep2)}
- clients  : {LOC(client1);LOC(client2);LOC(client3)}
+ clients  : {LOC(client1)}
+ eq_Op    : DEQ(Tok List)
  flrs     : 1
- f        : \x.1
+ ldrs     : {LOC(ldr1);LOC(ldr2)}
+ ldrs_uid : \loc.if loc = LOC(ldr1) then 1 else 3
+ locs     : {LOC(loc1);LOC(loc2);LOC(loc3);LOC(loc4)}
+ mf       : \hdr.1
+ reps     : {LOC(rep1);LOC(rep2)}
+ timeout  : 2
 
 %messages
  rep1 : (``request``, (Loc * (Int * Tok List)), (LOC(client), (12,``foobar``)))
