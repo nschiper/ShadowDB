@@ -43,7 +43,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -112,14 +111,14 @@ public class ShadowDBServer {
 	/**
 	 * The acknowledgments received by the primary.
 	 */
-	private final HashMap<TransactionId, HashSet<String>> acknowledgments;
+	private final ConcurrentHashMap<TransactionId, HashSet<String>> acks;
 
 	/**
 	 * A map of transactiont ids that come back as acknowledgments (from backups)
 	 * to transaction ids on which the client handler waits to be notified
 	 * when the answer is ready to be sent to the corresponding client.
 	 */
-	private final HashMap<TransactionId, TransactionId> id2IdMap;
+	private final ConcurrentHashMap<TransactionId, TransactionId> id2IdMap;
 
 	/**
 	 * A hashmap used to garbage collect the TRANS_EXECUTED hashtable. Transaction ids
@@ -130,7 +129,6 @@ public class ShadowDBServer {
 
 	private final TransactionIdGenerator idGenerator;
 
-	
 	/********* The following variables are used by the primary and the backups. ************/
 
 	/**
@@ -175,8 +173,8 @@ public class ShadowDBServer {
 		this.connection = DbUtils.openDbSql(dbType);
 
 	    this.nextSeqNo = nextSeqNo;
-	    this.acknowledgments = new HashMap<TransactionId, HashSet<String>>(100000);
-	    this.id2IdMap = new HashMap<TransactionId, TransactionId>(100000);
+	    this.acks = new ConcurrentHashMap<TransactionId, HashSet<String>>(100000);
+	    this.id2IdMap = new ConcurrentHashMap<TransactionId, TransactionId>(100000);
 
 	    this.gcTimeoutMillis = ShadowDBConfig.getGcTimeoutMillis();
 	    this.toGC = new LinkedHashMap<Long, TransactionId>();
@@ -252,27 +250,33 @@ public class ShadowDBServer {
 		boolean isPrimary) {
 
 		if (isPrimary) {
-			ClientHandler handler = new ClientHandler(clientSocket, selector);
+			ClientHandler handler = new ClientHandler(clientSocket, selector, acks, id2IdMap);
 			handler.start();
 		}
 	}
 
 	public void onMsgFromBackup(FailFastSocket backupSocket, long now) throws Exception {
 		TransactionId id = (TransactionId) backupSocket.readObject();
+		TransactionId firstId;
 
-		if (!acknowledgments.containsKey(id)) {
-			acknowledgments.put(id, new HashSet<String>());
-		} else if (acknowledgments.get(id).contains(backupSocket.getEndPointId())) {
+		if (id instanceof BatchId) {
+			// Batch ids are identified by the first id
+			firstId = ((BatchId) id).getIds().getFirst();
+		} else {
+			firstId = id;
+		}
+
+		if (!acks.containsKey(firstId)) {
+			acks.put(firstId, new HashSet<String>());
+		} else if (acks.get(firstId).contains(backupSocket.getEndPointId())) {
 			LOG.warning(dbIdToString() + " already received acknowledgment from "
-				+ backupSocket.getEndPointId() + " for id " + id);
+				+ backupSocket.getEndPointId() + " for id " + firstId);
 			return;
 		}
 
-		acknowledgments.get(id).add(backupSocket.getEndPointId());
+		acks.get(firstId).add(backupSocket.getEndPointId());
 
-		if (acknowledgments.get(id).size() == (group.getGroupSize() - 1)) {
-			acknowledgments.remove(id);
-
+		if (acks.get(firstId).size() == (group.getGroupSize() - 1)) {
 			LinkedList<TransactionId> transIds;
 
 			if (id instanceof BatchId) {
@@ -281,10 +285,17 @@ public class ShadowDBServer {
 				transIds = new LinkedList<TransactionId>();
 				transIds.add(id);
 			}
-
+	
 			for (TransactionId transId : transIds) {
+				/**
+				 * Insert the transaction ids of individual transactions
+				 * into the acknowledgments map (and not only the
+				 * id of the batch).
+				 */
+				acks.putIfAbsent(transId, group.getBackupIds());
+	
 				TransactionId clientTId = id2IdMap.get(transId);
-
+	
 				/**
 				 * The id is not in the id2IdMap for acknowledgments
 				 * related to a DbSchema transaction (sent when a reconfiguration occurs).
@@ -293,7 +304,7 @@ public class ShadowDBServer {
 					synchronized (clientTId) {
 						clientTId.notify();
 					}
-					id2IdMap.remove(transId);
+
 				/**
 				 * We got a confirmation from all backups that they applied
 				 * the database snapshot we just sent. We can now send the
@@ -302,11 +313,12 @@ public class ShadowDBServer {
 				 */
 				} else {
 					for (TransactionId tId : id2IdMap.values()) {
+						acks.putIfAbsent(tId, group.getBackupIds());
+
 						synchronized (tId) {
 							tId.notify();
 						}
 					}
-					id2IdMap.clear();
 				}
 			}
 		}		
@@ -315,6 +327,7 @@ public class ShadowDBServer {
 	public void onGroupReconfiguration(long seqNo) throws Exception {
 
 		nextSeqNo = seqNo;
+		acks.clear();
 
 		if (group.isPrimary()) {
 
@@ -453,7 +466,6 @@ public class ShadowDBServer {
 					synchronized (id2IdMap.get(transId)) {
 						id2IdMap.get(transId).notify();
 					}
-					id2IdMap.remove(transId);
 				}
 			}
 		}
@@ -537,12 +549,19 @@ public class ShadowDBServer {
 
 	private static class ClientHandler extends Thread {
 
-		private FailFastSocket clientSocket;
-		private Selector selector;
+		private final FailFastSocket clientSocket;
+		private final Selector selector;
+		private final ConcurrentHashMap<TransactionId, HashSet<String>> acks;
+		private final ConcurrentHashMap<TransactionId, TransactionId> id2IdMap;
 	
-		public ClientHandler(FailFastSocket clientSocket, Selector selector) {
+		public ClientHandler(FailFastSocket clientSocket, Selector selector,
+			ConcurrentHashMap<TransactionId, HashSet<String>> acks,
+			ConcurrentHashMap<TransactionId, TransactionId> id2IdMap) {
+	
 			this.clientSocket = clientSocket;
 			this.selector = selector;
+			this.acks = acks;
+			this.id2IdMap = id2IdMap;
 		}
 
 		public void run() {
@@ -558,13 +577,16 @@ public class ShadowDBServer {
 						selector.wakeup();
 
 						synchronized(t.getId()) {
-							while (!TRANS_EXECUTED.containsKey(t.getId())) {
+							while (!acks.containsKey(t.getId()) ||
+									acks.get(t.getId()).size() < ShadowDBConfig.getF()) {
 								t.getId().wait();
 							}
 						}
 						result = TRANS_EXECUTED.remove(t.getId());
 					}
 					clientSocket.writeObject(result);
+					acks.remove(t.getId());
+					id2IdMap.remove(t.getId());
 				}
 			} catch (Exception e) {
 				LOG.fine("Client handler caught exception: " + e + " stopping thread.");
