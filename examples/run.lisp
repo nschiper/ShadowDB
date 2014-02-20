@@ -1766,8 +1766,11 @@
 	(sb-thread:make-thread
 	 (lambda ()
 	   (progn
+	     ;;(print-eml-loc loc "sleeping...")
 	     (sleep (float (/ delay 1000)))
+	     ;;(print-eml-loc loc "woke up")
 	     (send-message-aux loc socket desc stream msg)
+	     ;;(print-eml-loc loc "message sent")
 	     ))
 	 :name "sender")
 	)
@@ -2398,7 +2401,8 @@
   )
 
 (defun delayed-message-handler-send-output (loc outnfo nfos output)
-  ;;(print-eml-loc loc "delayed-message-handler sending output")
+  ;; TOREMOVE
+  (print-eml-loc loc "delayed-message-handler sending output")
   (sb-thread:make-thread
    (lambda ()
      (let ((delay (get-delay-of-intransit-message output))

@@ -25,6 +25,8 @@
 #  o File name:   Makefile
 #
 
+ANERISMODE=INTERPRETED
+
 default: shadowdb aneris lib
 
 .PHONY: shadowdb
@@ -46,16 +48,16 @@ clean:
 	rm jars/ShadowDB.jar
 
 testdb:
-	(cd scripts; ./startDbServer.sh 1 ../conf/conf_aneris_local.emlc stdalone INTERPRETED)
+	(cd scripts; ./startDbServer.sh 1 ../conf/conf_aneris_local.emlc stdalone $(ANERISMODE))
 
 testrep1:
-	(cd scripts; ./startDbServer.sh 1 ../conf/conf_aneris_local.emlc replicated INTERPRETED)
+	(cd scripts; ./startDbServer.sh 1 ../conf/conf_aneris_local.emlc replicated $(ANERISMODE))
 
 testrep2:
-	(cd scripts; ./startDbServer.sh 2 ../conf/conf_aneris_local.emlc replicated INTERPRETED)
+	(cd scripts; ./startDbServer.sh 2 ../conf/conf_aneris_local.emlc replicated $(ANERISMODE))
 
 testrep3:
-	(cd scripts; ./startDbServer.sh 3 ../conf/conf_aneris_local.emlc replicated INTERPRETED)
+	(cd scripts; ./startDbServer.sh 3 ../conf/conf_aneris_local.emlc replicated $(ANERISMODE))
 
 testbank:
 	(cd scripts; ./startBankingClient.sh ../conf/conf_aneris_local.emlc read-only 50000 5 5 1)
