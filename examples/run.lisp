@@ -1513,6 +1513,7 @@
     (if (= len 0)
 	(progn
 	  (print-eml-loc loc (format nil "error: received empty vector from ~A" peer))
+	  (print-eml-loc loc (format nil "received so far: ~A" str))
 	  (error "received empty vector")
 	  )
 	(if (= len 1)
