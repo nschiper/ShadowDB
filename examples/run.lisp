@@ -1,4 +1,4 @@
-;; Copyright 2011 Cornell University
+; Copyright 2011 Cornell University
 ;; Copyright 2012 Cornell University
 ;; Copyright 2013 Cornell University
 ;;
@@ -2244,14 +2244,20 @@
   (if (and program msgs)
       (let ((msg  (car msgs))
 	    (rest (cdr msgs)))
-	(let* ((pair        (run-hdf loc program (mk-arg msg)))
-	       (new-program (pair-fst pair))
-	       (outputs     (intransit-messages-to-list (pair-snd pair))))
-	  ;; TO COMMENT 2
-	  ;;(print-eml-loc loc (format nil "sending ~A messages" (list-length outputs)))
-	  ;; inmsgs are the messages from outputs that we have to send to ourselves
-	  (let ((inmsgs (send-outputs loc outnfo nfos outputs nil)))
-	    (run-on-messages loc new-program (append rest inmsgs) outnfo nfos)
+	;; TOCOMMENT
+	;;(print-eml-loc loc (format nil "running on ~A" msg))
+	;; TOCOMMENT
+	;;(print-eml-loc loc "1")
+	(let ((pair (run-hdf loc program (mk-arg msg))))
+	  ;;(print-eml-loc loc "2")
+	  (let ((new-program (pair-fst pair))
+		(outputs     (intransit-messages-to-list (pair-snd pair))))
+	    ;; TO COMMENT 2
+	    ;;(print-eml-loc loc (format nil "sending ~A messages" (list-length outputs)))
+	    ;; inmsgs are the messages from outputs that we have to send to ourselves
+	    (let ((inmsgs (send-outputs loc outnfo nfos outputs nil)))
+	      (run-on-messages loc new-program (append rest inmsgs) outnfo nfos)
+	      )
 	    )
 	  )
 	)
@@ -2260,6 +2266,7 @@
   )
 
 (defun run-distributed-program-loop (loc member outnfo nfos program)
+  ;; TOCOMMENT
   ;;(print-eml-loc loc "waiting for a new message")
   (let* ((msgs (receive-messages loc nfos)))
     ;; TO COMMENT 2
@@ -2268,6 +2275,8 @@
     ;; TO COMMENT
     ;;(if member nil (print-eml-loc loc (format nil "~A" msgs)))
     (let ((new-program (run-on-messages loc program msgs outnfo nfos)))
+      ;; TOCOMMENT
+      ;;(print-eml-loc loc "ran program")
       (run-distributed-program-loop loc member outnfo nfos new-program)
       )
     )
@@ -2401,8 +2410,6 @@
   )
 
 (defun delayed-message-handler-send-output (loc outnfo nfos output)
-  ;; TOREMOVE
-  (print-eml-loc loc "delayed-message-handler sending output")
   (sb-thread:make-thread
    (lambda ()
      (let ((delay (get-delay-of-intransit-message output))
@@ -2433,6 +2440,7 @@
 
 (defun delayed-message-handler-loop (loc outnfo nfos)
   (let ((msgs (delayed-message-handler-get-msgs loc)))
+    ;; TOCOMMENT
     ;;(print-eml-loc loc (format nil "delayed-message-handler got messages ~A" msgs))
     (delayed-message-handler-send-outputs loc outnfo nfos msgs)
     (delayed-message-handler-loop loc outnfo nfos)
@@ -2626,7 +2634,7 @@
 
 ;; (defvar aneris-slow "aneris_slowrep_opt4_2lisp2.lisp")
 ;;(defvar aneris-conf "conf_aneris_local.emlc")
-(defvar aneris-conf "../conf/conf_aneris_batching.emlc")
+(defvar aneris-conf "conf_aneris_batching.emlc")
 
 ;;(load "paxos-list2.fasl")
 (if cbn
