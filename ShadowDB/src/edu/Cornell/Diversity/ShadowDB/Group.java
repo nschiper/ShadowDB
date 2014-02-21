@@ -183,7 +183,7 @@ public class Group extends Thread {
 
 		if (registeredDb.isReplicated()) {
 			int clientId = DbUtils.extractIntFromId(dbServer.getDbId());
-			this.tobcastClient = TobcastClient.newInstance(tobcastServers, clientPort, clientId, anerisType);
+			this.tobcastClient = TobcastClient.newInstance(tobcastServers, clientPort, anerisType);
 		}
 
 	    this.serverSocket = openServerSocket(serverPort);
@@ -315,7 +315,7 @@ public class Group extends Thread {
 	 * and closing connections to the previous group members.
 	 */
 	private void reconfigureGroup(AnerisMessage newConfig, Selector selector) {
-		assert(newConfig.getType() == AnerisMessage.ANERIS_MSG_TYPE.BCAST);
+		assert(newConfig.getType() == AnerisMessage.MessageType.BCAST);
 
 		LOG.info("\n" + groupIdToString() + ", received new group configuration: " + newConfig);
 
@@ -539,7 +539,7 @@ public class Group extends Thread {
 								LinkedList<AnerisMessage> msgs = tobcastClient.deliver();
 
 								for (AnerisMessage delivered : msgs) {
-									if (delivered.getType() == AnerisMessage.ANERIS_MSG_TYPE.BCAST) {
+									if (delivered.getType() == AnerisMessage.MessageType.BCAST) {
 										/**
 										 * Ignore reconfiguration messages that contain
 										 * the current group membership.
@@ -643,7 +643,7 @@ public class Group extends Thread {
 
 								if (msgs != null) {
 									for (AnerisMessage delivered : msgs) {
-										if (delivered.getType() == AnerisMessage.ANERIS_MSG_TYPE.BCAST) {
+										if (delivered.getType() == AnerisMessage.MessageType.BCAST) {
 											/**
 											 * Ignore reconfiguration messages that contain
 											 * the current group membership.

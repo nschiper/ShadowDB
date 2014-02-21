@@ -132,4 +132,18 @@ public class ShadowDBConfig {
 			return DEFAULT_F;
 		}
 	}
-}
+
+	/**
+	 * The maximum number of clients that broadcast messages using
+	 * Aneris. This is used to generate unique command identifiers
+	 * for these broadcast messages.
+	 */
+	private static final int DEFAULT_MAX_CLIENT = 20;
+
+	public static int getMaxClientCount() {
+		if (System.getProperty("maxAnerisClient") != null) {
+			return Integer.parseInt(System.getProperty("maxAnerisClient"));
+		} else {
+			return DEFAULT_MAX_CLIENT;
+		}
+	}}

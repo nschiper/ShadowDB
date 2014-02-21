@@ -146,7 +146,6 @@ public class MessageParser {
 
 			if (buffer.position() == 0) {
 				buffer.limit(header);
-				System.out.println("Set limit to " + header);
 			}
 
 			int nbBytes = from.read(buffer);
@@ -157,10 +156,7 @@ public class MessageParser {
 				return msg;
 			}
 
-			System.out.println("read " + buffer.position() + " bytes");
 			if (buffer.position() == header) {
-				System.out.println("read " + header + " bytes, parsing message");
-
 				expectingPayload = false;
 				buffer.flip();
 				msg = NIOUtils.deserializeObject(buffer);

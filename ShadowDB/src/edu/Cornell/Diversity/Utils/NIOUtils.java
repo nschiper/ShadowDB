@@ -64,6 +64,17 @@ public class NIOUtils {
 	 */
 	public static final int BYTE_COUNT_INT = Integer.SIZE / 8;
 
+	public static final int ERROR_HEADER_INT = -2;
+
+	/**
+	 * When reading from an Aneris channel, we will retry a couple
+	 * of times before giving up and considering the other end crashed.
+	 * More specifically, we will retry {@code RETRIAL_COUNT} times and
+	 * sleep {@code SLEEP_TIME_BETWEEN_TRIALS} number of times.
+	 */
+	private static final int RETRIAL_COUNT = 1000;
+	private static final int SLEEP_TIME_BETWEEN_TRIALS = 1;
+
 	/**
 	 * A byte marking the end of a header. This is used when communication
 	 * with Aneris.
@@ -129,6 +140,96 @@ public class NIOUtils {
 			}
 			buffer.flip();
 			return deserializeObject(buffer);
+		} else {
+			return null;
+		}
+	}
+
+	/**
+	 * <p> Reads a header from the given channel connected to the Aneris service using the provided buffer.
+	 * The header is returned as an integer. If the header could not be read,
+	 * {@code ERROR_HEADER_INT} is returned.
+	 * 
+	 * <p> This method uses an "ad-hoc" way to detect that the end host crashed: if after reading data
+	 * {@value #RETRIAL_COUNT} times from the channel (and sleeping {@value #SLEEP_TIME_BETWEEN_TRIALS} ms between
+	 * trials) no bytes could be read, we consider the end host dead and return {@code ERROR_HEADER_INT}.
+	 */
+	public static int readAnerisHeader(ReadableByteChannel from, ByteBuffer buffer) throws Exception {
+
+		int headerLength = 0;
+		int trialNo = 1;
+
+		do {
+			buffer.position(headerLength);
+			headerLength++;
+			buffer.limit(headerLength);
+
+			while (buffer.hasRemaining()) {
+				int bytesRead = from.read(buffer);
+
+				if (bytesRead == 0) {
+					Thread.sleep(SLEEP_TIME_BETWEEN_TRIALS);
+					trialNo++;
+					if (trialNo == RETRIAL_COUNT) {
+						return ERROR_HEADER_INT;
+					}
+				}
+				else if (bytesRead < 0) {
+					return ERROR_HEADER_INT;
+				}
+			}
+		} while (buffer.get(headerLength - 1) != '!');
+
+		// The returned header does not include the '!'.
+		byte[] headerBytes = new byte[headerLength - 1];
+		buffer.flip();
+		buffer.get(headerBytes);
+		String headerStr = new String(headerBytes);
+		return Integer.parseInt(headerStr);
+	}
+
+	/**
+	 * <p> Reads the next Aneris message from this channel and returns it in String form.
+	 * 
+	 * <p> This method uses an "ad-hoc" way to detect that the end host crashed: if after reading data
+	 * {@value #RETRIAL_COUNT} times from the channel (and sleeping {@value #SLEEP_TIME_BETWEEN_TRIALS} ms between
+	 * trials) no bytes could be read, we consider the end host dead and return null.
+	 * 
+	 * <p> This method also returns null if the other end closes the connection before we read
+	 * the string in its entirety.
+	 * 
+	 * @throws Exception if a problem occurred while reading the message.
+	 */
+	public static String readFromAnerisChannel(ReadableByteChannel chan, ByteBuffer buffer) throws Exception {
+
+		int nbBytes = readAnerisHeader(chan, buffer);
+
+		if (nbBytes != ERROR_HEADER_INT) {
+			buffer.position(0);
+			buffer.limit(nbBytes);
+
+			int trialNo = 1;
+
+			while (buffer.hasRemaining()) {
+				int bytesRead = chan.read(buffer);
+				if (bytesRead == 0) {
+					if (trialNo < RETRIAL_COUNT) {
+						trialNo++;
+						Thread.sleep(SLEEP_TIME_BETWEEN_TRIALS);
+					} else {
+						return null;
+					}
+				}
+				else if (chan.read(buffer) < 0) {
+					return null;
+				}
+			}
+			buffer.flip();
+			byte[] msgInBytes = new byte[nbBytes];
+			buffer.get(msgInBytes);
+			String msg = new String(msgInBytes);
+
+			return msg;
 		} else {
 			return null;
 		}

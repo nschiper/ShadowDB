@@ -327,9 +327,6 @@ public class FailFastSocket extends Thread {
 
 								if (MessageParser.headerValid(msgHeader)) {
 									lastRcvdMsgTS = now;
-									if (msgHeader == MessageParser.HEARTBEAT_HEADER) {
-										System.out.println(System.currentTimeMillis() + " received msg from: " + endPointId);
-									}
 								}
 							}
 							if (socketParser.expectingPayload()) {
@@ -345,7 +342,6 @@ public class FailFastSocket extends Thread {
 				}
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
 			System.out.println(System.currentTimeMillis() + " suspected " + endPointId + " because of exception");
 
 			/**
@@ -394,7 +390,6 @@ public class FailFastSocket extends Thread {
         				}
         			}
         		}
-        		System.out.println("Parsed message: " + msg);
         		if (rcvPipeParser.endPointSuspected()) {
             		throw new SuspectedCrashException(endPointId);
             	}
