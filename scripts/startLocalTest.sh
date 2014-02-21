@@ -17,7 +17,7 @@ function test(){
     ${TERMINAL} --working-directory=${DIR} --title=${EMLWINTITLE}m3 --hide-menubar --geometry 100x20+700+0    -x bash -c "wmctrl -r :ACTIVE: -N ${EMLWINTITLE}m3; ./startAneris3-lisp.sh; bash; wmctrl -r :ACTIVE: -N ${EMLWINTITLE}m3"
     sleep 2
     ${TERMINAL} --working-directory=${DIR} --title=${EMLWINTITLE}m4 --hide-menubar --geometry 100x20+1050+0   -x bash -c "wmctrl -r :ACTIVE: -N ${EMLWINTITLE}m4; ./startAneris4-lisp.sh; bash; wmctrl -r :ACTIVE: -N ${EMLWINTITLE}m4"
-    sleep 13
+    sleep 10
 
     # Clients
     ${TERMINAL} --working-directory=${DIR} --title=${EMLWINTITLE}cl1 --hide-menubar --geometry 100x20+0+340    -x bash -c "wmctrl -r :ACTIVE: -N ${EMLWINTITLE}cl1; cd ..; make testrep1 ANERISMODE=LISP; bash; wmctrl -r :ACTIVE: -N ${EMLWINTITLE}cl1"
