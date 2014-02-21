@@ -1050,11 +1050,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defun print-eml-loc (loc str)
-  (format t (concatenate 'string "[" loc ":" str "]~%"))
-  (finish-output)
-  )
-
 (defun new-socket ()
   (let ((socket (make-instance 'sb-bsd-sockets:inet-socket
 			       :type :stream
@@ -2245,11 +2240,11 @@
       (let ((msg  (car msgs))
 	    (rest (cdr msgs)))
 	;; TOCOMMENT
-	;;(print-eml-loc loc (format nil "running on ~A" msg))
+	(print-eml-loc loc (format nil "running on ~A" msg))
 	;; TOCOMMENT
-	;;(print-eml-loc loc "1")
+	(print-eml-loc loc "1")
 	(let ((pair (run-hdf loc program (mk-arg msg))))
-	  ;;(print-eml-loc loc "2")
+	  (print-eml-loc loc "2")
 	  (let ((new-program (pair-fst pair))
 		(outputs     (intransit-messages-to-list (pair-snd pair))))
 	    ;; TO COMMENT 2

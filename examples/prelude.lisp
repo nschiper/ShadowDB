@@ -1,3 +1,8 @@
+(defun print-eml-loc (loc str)
+  (format t (concatenate 'string "[" loc ":" str "]~%"))
+  (finish-output)
+  )
+
 ;; ------ structures ------
 
 (defstruct pair
@@ -11,4 +16,7 @@
 
 ;; ------ functions ------
 
-(defun fix (f) (funcall f (lambda () (fix f))))
+(defun fix (str f)
+  ;;(print-eml-loc "fix" str)
+  (funcall f #'(lambda () (fix str f)))
+  )
