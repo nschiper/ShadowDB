@@ -110,7 +110,7 @@ public class ShadowDBConfig {
 	 *  the new configuration. This is to make sure that they all
 	 *  delivered the new configuration.
 	 */
-	private static final int DEFAULT_GROUP_RECONFIGURATION_TIME = 10000;
+	private static final int DEFAULT_GROUP_RECONFIGURATION_TIME = 2 * DEFAULT_HEARBEAT_TIMEOUT;
 
 	public static int getGroupReconfigurationTime() {
 		if (System.getProperty("groupReconfigurationTime") != null) {
@@ -132,4 +132,18 @@ public class ShadowDBConfig {
 			return DEFAULT_F;
 		}
 	}
-}
+
+	/**
+	 * The maximum number of clients that broadcast messages using
+	 * Aneris. This is used to generate unique command identifiers
+	 * for these broadcast messages.
+	 */
+	private static final int DEFAULT_MAX_CLIENT = 20;
+
+	public static int getMaxClientCount() {
+		if (System.getProperty("maxAnerisClient") != null) {
+			return Integer.parseInt(System.getProperty("maxAnerisClient"));
+		} else {
+			return DEFAULT_MAX_CLIENT;
+		}
+	}}

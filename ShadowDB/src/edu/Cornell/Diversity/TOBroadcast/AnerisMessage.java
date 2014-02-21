@@ -38,47 +38,48 @@
 
 package edu.Cornell.Diversity.TOBroadcast;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import edu.Cornell.Diversity.ShadowDB.ShadowDBConfig;
 import edu.Cornell.Diversity.TOBroadcast.TobcastClient.AnerisType;
 import edu.Cornell.Diversity.Utils.DbUtils;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 
 /**
- * This class represents messages exchanged with the Aneris total
+ * This class represents messages sent/received to/from the Aneris Diversified
  * ordered broadcast service.
  * 
- * An Aneris message is either a group reconfiguration request or a protocol change.
+ * This message is either a group reconfiguration request, a protocol change, or
+ * a mini-transaction.
  * 
  * @author nschiper@cs.cornell.edu
  */
 public class AnerisMessage {
 
-	private static Pattern MSG_DELIMITER_PATTERN = Pattern.compile(TobcastClient.MSG_SEPARATOR);
-	private static Pattern CMD_PATTERN = Pattern.compile("\\#\\#\\#(.)+\\#\\#\\#");
+	private static Pattern CMD_SEPARATOR = Pattern.compile("\\#\\#\\#(.)+\\#\\#\\#");
+
 	private static Pattern ID_PATTERN = Pattern.compile("\\p{Alpha}+\\d+");
 	private static Pattern INTEGER_PATTERN = Pattern.compile("\\#(\\d+)\\#");
 	private static Pattern PORT_PATTERN = Pattern.compile("\\-(\\d+)\\#");
 	private static Pattern IP_PATTERN = Pattern.compile("\\-(\\d+\\-\\d+\\-\\d+\\-\\d+)\\-");
 	private static Pattern NATURAL_NUMBER_PATTERN = Pattern.compile("natural_number:,\\d+:n");
+	private static String NATURAL_NUMBER_STRING = "natural_number:,";
+	private static String LISP_DELIMETER = "FST \\d+";
 
-	/**
-	 * This is used to generate unique identifiers for broadcast messages.
-	 */
+	// This is used to generate unique ids for broadcast messages.
 	private static AtomicLong id = new AtomicLong(0);
 
-	/**
-	 * The proposerId of a swap message is a "FakeId0".
-	 * The ids of such messages will thus start from 0.
-	 */
+	// The proposerId of a swap message is a "FakeId0".
+	// The ids of such messages will thus start from 0.
 	private static String FAKE_ID = "FakeId0";
 
 	/**
-	 * The Nuprl term format to send messages to Aneris when interpreted.
+	 * The Nuprl term format to send messages to Aneris.
 	 */
 	public static final String ANERIS_SEND_MSG_FORMAT = new StringBuffer()
 		.append("{pair:OPID}")
@@ -116,12 +117,13 @@ public class AnerisMessage {
 		.append("({token:OPID,%s:t}();") // decided command
 		.append("{axiom:OPID}())))))").toString();
 
-	public static enum ANERIS_MSG_TYPE {
-		BCAST("bcast"), SWAP("swap"), DUMMY("bcast");
+	public enum MessageType {
+		// For Aneris, transactions are also broadcast messages.
+		BCAST("bcast"), SWAP("swap"), TRANS("bcast"), DUMMY("bcast");
 
 		private String name;
 
-		private ANERIS_MSG_TYPE(String name) {
+		private MessageType(String name) {
 			this.name = name;
 		}
 
@@ -130,12 +132,13 @@ public class AnerisMessage {
 		}
 	};
 
-	public static enum PROTOCOL_TYPE {
+	// Variables for swap messages
+	public enum ProtocolType {
 		PAXOS("paxos"), TWOTHIRD("2/3");
 
 		private String name;
 
-		private PROTOCOL_TYPE(String name) {
+		private ProtocolType(String name) {
 			this.name = name;
 		}
 
@@ -144,52 +147,58 @@ public class AnerisMessage {
 		}
 	}
 
-	private ANERIS_MSG_TYPE msgType;
+	private MessageType msgType;
 
-	private PROTOCOL_TYPE protocol;
+	private ProtocolType protocol;
 
 	private long uid;
 
-	/**
-	 * Variables used for broadcast messages
-	 */
+	// Variables for bcast messages
 	private LinkedList<IdIpPort> members;
 	private long seqNo;
 	private String proposerId;
 
-	/**
-	 * The index (or slot) of the Aneris message
-	 */
+	// Variables for mini-transactions
+	private String clientId;
+	private LinkedList<Integer> keysToRead;
+	private HashMap<Integer, Integer> keysToWrite;
+
+	// The index (or slot) of the Aneris message
 	private long slot;
 
-	private AnerisMessage(PROTOCOL_TYPE protocol) {
-		this.msgType = ANERIS_MSG_TYPE.SWAP;
+	public AnerisMessage(ProtocolType protocol) {
+		this.msgType = MessageType.SWAP;
 		this.protocol = protocol;
 		this.proposerId = FAKE_ID;
-	}
-
-	public AnerisMessage(PROTOCOL_TYPE protocol, int proposerId) {
-		this.msgType = ANERIS_MSG_TYPE.SWAP;
-		this.protocol = protocol;
-		this.proposerId = FAKE_ID;
-		this.uid = proposerId * 100000000L + id.incrementAndGet();
+		this.uid = id.incrementAndGet();
 	}
 
 	public AnerisMessage(LinkedList<IdIpPort> members, long seqNo, String proposerId) {
-		this.msgType = ANERIS_MSG_TYPE.BCAST;
+		this.msgType = MessageType.BCAST;
 		this.members = members;
 		this.seqNo = seqNo;
 		this.proposerId = proposerId;
-		this.uid = DbUtils.extractIntFromId(proposerId) * 100000000L + id.incrementAndGet();
+		this.uid = DbUtils.extractIntFromId(proposerId) + (ShadowDBConfig.getMaxClientCount() * id.incrementAndGet());
+	}
+
+	public AnerisMessage(String clientId, LinkedList<Integer> keysToRead,
+		HashMap<Integer, Integer> keysToWrite) {
+
+		this.msgType = MessageType.TRANS;
+		this.clientId = clientId;
+		this.keysToRead = keysToRead;
+		this.keysToWrite = keysToWrite;
+		this.proposerId = FAKE_ID;
+		this.uid = DbUtils.extractIntFromId(proposerId) + (ShadowDBConfig.getMaxClientCount() * id.incrementAndGet());
 	}
 
 	/**
 	 * Builds an empty Aneris message.
 	 */
 	public AnerisMessage(String proposerId) {
-		this.msgType = ANERIS_MSG_TYPE.DUMMY;
+		this.msgType = MessageType.DUMMY;
 		this.proposerId = proposerId;
-		this.uid = DbUtils.extractIntFromId(proposerId) * 100000000L + id.incrementAndGet();
+		this.uid = id.incrementAndGet();
 	}
 
 	public static AnerisMessage parseConfiguration(String configuration) {
@@ -221,16 +230,51 @@ public class AnerisMessage {
 		throw new IllegalArgumentException("Wrong format for group configuration: " + configuration);	
 	}
 
+	public static AnerisMessage parseMiniTransaction(String miniTransaction) {
+
+		String[] tokens = miniTransaction.split("[$]");
+
+		// The 2nd token is the clientId
+		String clientId = tokens[1].trim();
+
+		// The next token is a sequence of keys to read separated by '&'.
+		LinkedList<Integer> keysToRead = new LinkedList<Integer>();
+
+		if (!tokens[2].isEmpty()) {
+			String[] toRead = tokens[2].split("[&]"); 
+	
+			for (String token : toRead) {
+				if (!token.isEmpty()) {
+					keysToRead.add(Integer.parseInt(token));
+				}
+			}
+		}
+
+		// The next token is a sequence of key value pairs to write separated by '&'.
+		HashMap<Integer, Integer> keysToWrite = new HashMap<Integer, Integer>();
+
+		if (!tokens[3].isEmpty()) {
+			String[] toWrite = tokens[3].split("[&]");
+	
+			for (int i = 0; i < toWrite.length; i+= 2) {
+				int key = Integer.parseInt(toWrite[i]);
+				int value = Integer.parseInt(toWrite[i + 1]);
+				keysToWrite.put(key, value);
+			}
+		}
+		return new AnerisMessage(clientId, keysToRead, keysToWrite);
+	}
+
 	/**
-	 * Parses an Aneris message when it contains a protocol.
+	 * Parses an aneris message when it contains a protocol.
 	 */
 	private static AnerisMessage parseProtocol(String msg) {
-		PROTOCOL_TYPE protocol = null;
+		ProtocolType protocol = null;
 		
-		if (msg.contains(PROTOCOL_TYPE.PAXOS.toString())) {
-			protocol = PROTOCOL_TYPE.PAXOS;
-		} else if (msg.contains(PROTOCOL_TYPE.TWOTHIRD.toString())) {
-			protocol = PROTOCOL_TYPE.TWOTHIRD;
+		if (msg.contains(ProtocolType.PAXOS.toString())) {
+			protocol = ProtocolType.PAXOS;
+		} else if (msg.contains(ProtocolType.TWOTHIRD.toString())) {
+			protocol = ProtocolType.TWOTHIRD;
 		}
 		if (protocol != null) {
 			AnerisMessage anerisMsg = new AnerisMessage(protocol);
@@ -253,20 +297,22 @@ public class AnerisMessage {
 	/**
 	 * Parses one decided value in Nuprl format.
 	 */
-	private static AnerisMessage parseOneCmd(String msg, ANERIS_MSG_TYPE msgType) {
+	private static AnerisMessage parseOneCmd(String msg, MessageType msgType) {
 		AnerisMessage anerisMsg;
 
-		if (msgType == ANERIS_MSG_TYPE.BCAST) {
+		if (msgType == MessageType.BCAST || msgType == MessageType.TRANS) {
 
-			Matcher matcher = CMD_PATTERN.matcher(msg);
+			Matcher matcher = CMD_SEPARATOR.matcher(msg);
 
 			if (matcher.find()) {
 				String msgContent = matcher.group();
 
-				if (msg.contains(ANERIS_MSG_TYPE.DUMMY.name())) {
+				if (msg.contains(MessageType.DUMMY.name())) {
 					anerisMsg = parseDummy(msgContent);
-				} else if (msgContent.contains(ANERIS_MSG_TYPE.BCAST.name())) {
+				} else if (msgContent.contains(MessageType.BCAST.name())) {
 					anerisMsg = parseConfiguration(msgContent);
+				} else if (msgContent.contains(MessageType.TRANS.name())) {
+					anerisMsg = parseMiniTransaction(msgContent);
 				} else {
 					throw new IllegalArgumentException("Unknown aneris message type: " + msg);
 				}
@@ -274,7 +320,7 @@ public class AnerisMessage {
 				throw new IllegalArgumentException("Incorrect syntax for decided command: " + msg);
 			}
 		
-		} else if (msgType == ANERIS_MSG_TYPE.SWAP) {
+		} else if (msgType == MessageType.SWAP) {
 			anerisMsg = parseProtocol(msg);
 
 		} else {
@@ -304,11 +350,11 @@ public class AnerisMessage {
 		} else if (anerisType == AnerisType.LISP) {
 			Scanner scanner = new Scanner(msg);
 			while (scanner.hasNext()) {
-				if (scanner.hasNextLong()) {
-					index = scanner.nextLong();
+				if (scanner.hasNextInt()) {
+					index = scanner.nextInt();
 					return index;
 				} else {
-					scanner.next();
+					String token = scanner.next();
 				}
 			}
 		}
@@ -317,35 +363,41 @@ public class AnerisMessage {
 
 	/**
 	 * Parses a message when received from the interpreted version
-	 * of Aneris. This message may contain multiple commands.
+	 * of Aneris. This may contain multiple batched commands.
 	 */
 	private static LinkedList<AnerisMessage> parseStringInterpreted(String msg, long slot) {
 		LinkedList<AnerisMessage> anerisMsgs = new LinkedList<AnerisMessage>();
 		AnerisMessage anerisMsg;
 	
-		ANERIS_MSG_TYPE msgType;
-		if (msg.contains(ANERIS_MSG_TYPE.DUMMY.name()) ||
-			msg.contains(ANERIS_MSG_TYPE.BCAST.name())) {
+		MessageType msgType;
+		if (msg.contains(MessageType.DUMMY.name()) ||
+			msg.contains(MessageType.BCAST.name()) ||
+			msg.contains(MessageType.TRANS.name())) {
 
-			msgType = ANERIS_MSG_TYPE.BCAST;
+			msgType = MessageType.BCAST;
+
+			String[] tokens = msg.split(NATURAL_NUMBER_STRING);
+
+			/**
+			 * The first natural number if the slot number, then
+			 * comes the list of decided commands.
+			 */
+			for (int i = 2; i < tokens.length; i++) {
+				anerisMsg = parseOneCmd(tokens[i], msgType);
+				anerisMsg.setSlot(slot);
+				anerisMsgs.add(anerisMsg);
+			}
+
+			return anerisMsgs;
 
 		} else if (msg.contains("inl")) {
-			msgType = ANERIS_MSG_TYPE.SWAP;
+			// There's no batching for protocol change messages.
+			anerisMsgs.add(parseProtocol(msg));
+			return anerisMsgs;
+
 		} else {
 			throw new IllegalArgumentException("Received aneris message has wrong format: " + msg);
 		}
-
-		// The string may contain multiple commands
-		Scanner scanner = new Scanner(msg);
-		scanner.useDelimiter(TobcastClient.MSG_SEPARATOR);
-
-		while (scanner.hasNext()) {
-			String cmd = scanner.next();
-			anerisMsg = parseOneCmd(cmd, msgType);
-			anerisMsg.setSlot(slot);
-			anerisMsgs.add(anerisMsg);
-		}
-		return anerisMsgs;
 	}
 
 	/**
@@ -355,26 +407,29 @@ public class AnerisMessage {
 	private static LinkedList<AnerisMessage> parseStringLisp(String msg, long slot) {
 		LinkedList<AnerisMessage> anerisMsgs = new LinkedList<AnerisMessage>();
 		AnerisMessage anerisMsg;
-		ANERIS_MSG_TYPE msgType;
+		MessageType msgType;
 
-		if (msg.contains(ANERIS_MSG_TYPE.DUMMY.name()) ||
-			msg.contains(ANERIS_MSG_TYPE.BCAST.name())) {
+		if (msg.contains(MessageType.DUMMY.name()) ||
+			msg.contains(MessageType.BCAST.name()) ||
+			msg.contains(MessageType.TRANS.name())) {
 
-			msgType = ANERIS_MSG_TYPE.BCAST;
+			msgType = MessageType.BCAST;
+
+			String[] tokens = msg.split(LISP_DELIMETER);
+
+			/**
+			 * The first natural number if the slot number, then
+			 * comes the list of decided commands.
+			 */
+			for (int i = 2; i < tokens.length; i++) {
+				anerisMsg = parseOneCmd(tokens[i], msgType);
+				anerisMsg.setSlot(slot);
+				anerisMsgs.add(anerisMsg);
+			}
 
 		} else {
-			msgType = ANERIS_MSG_TYPE.SWAP;
-		}
-
-		// The string may contain multiple commands
-		Scanner scanner = new Scanner(msg);
-		scanner.useDelimiter(MSG_DELIMITER_PATTERN);
-
-		while (scanner.hasNext()) {
-			String cmd = scanner.next();
-			anerisMsg = parseOneCmd(cmd, msgType);
-			anerisMsg.setSlot(slot);
-			anerisMsgs.add(anerisMsg);
+			anerisMsgs.add(parseOneCmd(msg, MessageType.SWAP));
+			return anerisMsgs;
 		}
 
 		return anerisMsgs;
@@ -411,7 +466,7 @@ public class AnerisMessage {
 		}
 	}
 
-	public static String toNuprlString(AnerisType type, ANERIS_MSG_TYPE msgType, long commandId, String nuprlProposal) {
+	public static String toNuprlString(AnerisType type, MessageType msgType, long commandId, String nuprlProposal) {
 		if (type == AnerisType.INTERPRETED) {
 			return String.format(ANERIS_SEND_MSG_FORMAT, msgType, commandId, nuprlProposal);
 		} else {
@@ -436,7 +491,7 @@ public class AnerisMessage {
 	public String nuprlProposal() {
 		StringBuffer sb = new StringBuffer();
 
-		if (msgType == ANERIS_MSG_TYPE.BCAST) {
+		if (msgType == MessageType.BCAST) {
 			sb.append("###" + msgType.name() + "#");
 			sb.append("#" + proposerId + "#");
 			sb.append("#" + seqNo + "#");
@@ -444,8 +499,34 @@ public class AnerisMessage {
 				sb.append("#" + member.toNuPRLString() + "#");
 			}
 			sb.append("##");
-		} else if (msgType == ANERIS_MSG_TYPE.DUMMY) {
-			sb.append(ANERIS_MSG_TYPE.DUMMY.name());
+		} else if (msgType == MessageType.TRANS) {
+			sb.append("###" + msgType.name() + "$");
+			sb.append(clientId + "$");
+
+			int keyCount = 0;
+			for (int key : keysToRead) {
+				keyCount++;
+				if (keyCount < keysToRead.size()) {
+					sb.append(key + "&");
+				} else {
+					sb.append(key);
+				}
+			}
+			sb.append("$");
+
+			keyCount = 0;
+			for (int key : keysToWrite.keySet()) {
+				keyCount++;
+				if (keyCount < keysToWrite.size()) {
+					sb.append(key + "&" + keysToWrite.get(key) + "&");
+				} else {
+					sb.append(key + "&" + keysToWrite.get(key));
+				}
+			}
+			sb.append("$###");
+
+		} else if (msgType == MessageType.DUMMY) {
+			sb.append(MessageType.DUMMY.name());
 			sb.append("###");
 			sb.append(proposerId);
 			sb.append("###");
@@ -461,7 +542,7 @@ public class AnerisMessage {
 
 		sb.append("slot: " + slot + ", type: " + msgType.name());
 	
-		if (msgType == ANERIS_MSG_TYPE.BCAST) {
+		if (msgType == MessageType.BCAST) {
 			sb.append("<proposerId: " + proposerId);
 			sb.append(" seqNo: " + seqNo);
 			sb.append(" members: (");
@@ -469,19 +550,32 @@ public class AnerisMessage {
 				sb.append(" " + member);
 			}
 			sb.append(" )>");
-		} else if (msgType == ANERIS_MSG_TYPE.SWAP) {
+		} else if (msgType == MessageType.TRANS) {
+			sb.append(" clientId: " + clientId);
+			sb.append(" <keys to read: { ");
+
+			for (int key : keysToRead) {
+				sb.append(key + " ");
+			}
+			sb.append("}, keys to write: { ");
+			for (int key : keysToWrite.keySet()) {
+				sb.append("(" + key + ", " + keysToWrite.get(key) + ") ");
+			}
+			sb.append("} >");
+
+		} else if (msgType == MessageType.SWAP) {
 			sb.append(": " + protocol);
-		} else if (msgType == ANERIS_MSG_TYPE.DUMMY) {
+		} else if (msgType == MessageType.DUMMY) {
 			sb.append(" proposer id: " + proposerId);
 		}
 		return sb.toString();
 	}
 
-	public ANERIS_MSG_TYPE getType() {
+	public MessageType getType() {
 		return msgType;
 	}
 
-	public PROTOCOL_TYPE getProtocol() {
+	public ProtocolType getProtocol() {
 		return protocol;
 	}
 
@@ -503,5 +597,17 @@ public class AnerisMessage {
 
 	private void setSlot(long slot) {
 		this.slot = slot;
+	}
+
+	public LinkedList<Integer> getKeysToRead() {
+		return keysToRead;
+	}
+
+	public HashMap<Integer, Integer> getKeysToWrite() {
+		return keysToWrite;
+	}
+
+	public String getClientId() {
+		return clientId;
 	}
 }

@@ -43,7 +43,7 @@ import java.util.LinkedList;
 import java.util.logging.Logger;
 
 import edu.Cornell.Diversity.TOBroadcast.AnerisMessage;
-import edu.Cornell.Diversity.TOBroadcast.AnerisMessage.PROTOCOL_TYPE;
+import edu.Cornell.Diversity.TOBroadcast.AnerisMessage.ProtocolType;
 import edu.Cornell.Diversity.TOBroadcast.TobcastClient;
 import edu.Cornell.Diversity.TOBroadcast.TobcastClient.AnerisType;
 import edu.Cornell.Diversity.Utils.ConfigurationParser;
@@ -67,7 +67,7 @@ public class TobcastApp extends Thread {
 	private float throughput;
 	private final LinkedList<Long> latencies;
 
-	public TobcastApp(String configFile, int clientId, int bcastCount, PROTOCOL_TYPE protocol,
+	public TobcastApp(String configFile, int clientId, int bcastCount, ProtocolType protocol,
 		AnerisType anerisType, boolean changeProtocol) {
 
 		this.clientId = clientId;
@@ -81,7 +81,7 @@ public class TobcastApp extends Thread {
 			if (clientPort == null) {
 				clientPort = TobcastClient.EXTERNAL_CLIENT;
 			}
-			tobcast = TobcastClient.newInstance(tobcastServers, clientPort, clientId, anerisType);
+			tobcast = TobcastClient.newInstance(tobcastServers, clientPort, anerisType);
 			configParser.closeConfigFile();
 
 			latencies = new LinkedList<Long>();
@@ -89,7 +89,7 @@ public class TobcastApp extends Thread {
 			throughput = 0f;
 
 			if (changeProtocol) {
-				AnerisMessage chgProtocol = new AnerisMessage(protocol, clientId);
+				AnerisMessage chgProtocol = new AnerisMessage(protocol);
 				tobcast.toBcast(chgProtocol);
 				LinkedList<AnerisMessage> confirmation = tobcast.deliver();
 				LOG.info("Changed protocol to: " + confirmation);
@@ -239,7 +239,7 @@ public class TobcastApp extends Thread {
 				int clientCount = Integer.parseInt(args[1]);
 				int bcastCount = Integer.parseInt(args[2]);
 				AnerisType anerisType = AnerisType.valueOf(args[3]);
-				PROTOCOL_TYPE protocol = PROTOCOL_TYPE.valueOf(args[4]);
+				ProtocolType protocol = ProtocolType.valueOf(args[4]);
 
 				TobcastApp[] clients = new TobcastApp[clientCount];
 

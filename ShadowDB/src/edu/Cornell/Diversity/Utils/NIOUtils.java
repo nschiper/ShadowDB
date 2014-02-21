@@ -44,7 +44,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.Pipe;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -61,30 +60,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class NIOUtils {
 
 	/**
-	 *  The number of bytes of a long.
-	 */
-	public static final int BYTE_COUNT_LONG = Long.SIZE / 8;
-
-	/**
 	 * The number of bytes of an int.
 	 */
 	public static final int BYTE_COUNT_INT = Integer.SIZE / 8;
-
-	/**
-	 * An error indicating that a header could not be read.
-	 */
-	public static final long ERROR_HEADER_LONG = -2;
 
 	public static final int ERROR_HEADER_INT = -2;
 
 	/**
 	 * When reading from an Aneris channel, we will retry a couple
 	 * of times before giving up and considering the other end crashed.
-	 * More specifically, we will retry {@code RETRY_COUNT} times and
+	 * More specifically, we will retry {@code RETRIAL_COUNT} times and
 	 * sleep {@code SLEEP_TIME_BETWEEN_TRIALS} number of times.
 	 */
-	private static final int RETRY_COUNT = 10;
-	private static final int SLEEP_TIME_BETWEEN_TRIALS = 1000;
+	private static final int RETRIAL_COUNT = 1000;
+	private static final int SLEEP_TIME_BETWEEN_TRIALS = 1;
 
 	/**
 	 * A byte marking the end of a header. This is used when communication
@@ -107,10 +96,10 @@ public class NIOUtils {
 	 * Writes the object to the channel using the provided byte buffer for serialization.
 	 * Returns a boolean indicating whether the operation was successful.
 	 */
-	public static boolean writeToChannel(WritableByteChannel chan, Object obj, ByteBuffer buffer)
+	public static boolean writeToChannel(WritableByteChannel chan, Object obj, ByteBuffer buffer, ByteArrayOutputStream baos)
 		throws IOException {
 
-		boolean success = serializeObject(obj, buffer, false /* markEndOfHeader */);
+		boolean success = serializeObject(obj, buffer, baos, false /* markEndOfHeader */);
 
 		if (success) {
 			while (buffer.hasRemaining()) {
@@ -121,84 +110,39 @@ public class NIOUtils {
 	}
 
 	/**
-	 * Transfer noBytes bytes from one channel to the other using the provided byte buffer.
-	 * The byte count does not include the header that denotes the number of bytes the object
-	 * takes in serialized form.
-	 * 
-	 * This method returns a boolean indicating whether the transfer was successful.
+	 * Returns the next object to be read from this channel, or null if
+	 * no data can be read at this moment. This method assumes that the
+	 * channel is in non-blocking mode and uses the provided buffer to
+	 * read the object in serialized form from the channel. It is assumed
+	 * that the buffer is big enough to hold the entire object in serialized form.
 	 */
-	public static boolean transferData(long nbBytes, ReadableByteChannel from, WritableByteChannel to,
-		ByteBuffer buffer) throws IOException {
+	public static Object readObjFromChannel(ReadableByteChannel chan, ByteBuffer buffer,
+		AtomicBoolean endPointCrashed) throws Exception {
 
 		buffer.clear();
+		buffer.limit(BYTE_COUNT_INT);
 
-		// We first put the number of bytes of the object in serialized form.
-		buffer.putLong(nbBytes);
-
-		long bytesTransfered = 0;
-
-		while (bytesTransfered <  (nbBytes + BYTE_COUNT_LONG)) {
-			if (bytesTransfered != 0) {
-				buffer.clear();
-			}
-
-			// Make sure we do not read too much from the channel
-			long noBytesRemaining = (nbBytes + BYTE_COUNT_LONG) - bytesTransfered;
-
-			if (noBytesRemaining < buffer.capacity()) {
-				// Buffers are never bigger than 2GB, it is
-				// thus safe to cast to int.
-				buffer.limit((int) noBytesRemaining);
-			}
-
+		if (chan.read(buffer) > 0) {
 			while (buffer.hasRemaining()) {
-				if (from.read(buffer) < 0) {
-					return false;
-				}
+				chan.read(buffer);
 			}
-
 			buffer.flip();
+			int nbBytes = buffer.getInt();
 
-			boolean notifiedThread = false;
+			buffer.clear();
+			buffer.limit(nbBytes);
 
 			while (buffer.hasRemaining()) {
-				bytesTransfered += to.write(buffer);
-
-				/**
-				 *  Notify the thread that is waiting to read from this pipe.
-				 *  It is necessary to do this when the writable channel is full
-				 *  and cannot be written unless a thread consumes part of what
-				 *  was written.
-				 */
-				if (to instanceof Pipe.SinkChannel && !notifiedThread) {
-					notifiedThread = true;
-
-					synchronized (to) {
-						to.notify();
-					}
+				if (chan.read(buffer) <= 0 && endPointCrashed.get()) {
+					return null;
 				}
+
 			}
+			buffer.flip();
+			return deserializeObject(buffer);
+		} else {
+			return null;
 		}
-		return true;
-	}
-
-	/**
-	 * Reads a header from the given channel using the provided buffer.
-	 * The header is returned as a long. If the header could not be read,
-	 * {@code ERROR_HEADER} is returned.
-	 */
-	public static long readHeader(ReadableByteChannel from, ByteBuffer buffer) throws IOException {
-		buffer.clear();
-		buffer.limit(BYTE_COUNT_LONG);
-
-		while(buffer.hasRemaining()) {
-			if (from.read(buffer) < 0) {
-				return ERROR_HEADER_LONG;
-			}
-		}
-		buffer.flip();
-
-		return buffer.getLong();
 	}
 
 	/**
@@ -207,7 +151,7 @@ public class NIOUtils {
 	 * {@code ERROR_HEADER_INT} is returned.
 	 * 
 	 * <p> This method uses an "ad-hoc" way to detect that the end host crashed: if after reading data
-	 * {@value #RETRY_COUNT} times from the channel (and sleeping {@value #SLEEP_TIME_BETWEEN_TRIALS} ms between
+	 * {@value #RETRIAL_COUNT} times from the channel (and sleeping {@value #SLEEP_TIME_BETWEEN_TRIALS} ms between
 	 * trials) no bytes could be read, we consider the end host dead and return {@code ERROR_HEADER_INT}.
 	 */
 	public static int readAnerisHeader(ReadableByteChannel from, ByteBuffer buffer) throws Exception {
@@ -222,10 +166,11 @@ public class NIOUtils {
 
 			while (buffer.hasRemaining()) {
 				int bytesRead = from.read(buffer);
+
 				if (bytesRead == 0) {
 					Thread.sleep(SLEEP_TIME_BETWEEN_TRIALS);
 					trialNo++;
-					if (trialNo == RETRY_COUNT) {
+					if (trialNo == RETRIAL_COUNT) {
 						return ERROR_HEADER_INT;
 					}
 				}
@@ -247,7 +192,7 @@ public class NIOUtils {
 	 * <p> Reads the next Aneris message from this channel and returns it in String form.
 	 * 
 	 * <p> This method uses an "ad-hoc" way to detect that the end host crashed: if after reading data
-	 * {@value #RETRY_COUNT} times from the channel (and sleeping {@value #SLEEP_TIME_BETWEEN_TRIALS} ms between
+	 * {@value #RETRIAL_COUNT} times from the channel (and sleeping {@value #SLEEP_TIME_BETWEEN_TRIALS} ms between
 	 * trials) no bytes could be read, we consider the end host dead and return null.
 	 * 
 	 * <p> This method also returns null if the other end closes the connection before we read
@@ -268,7 +213,7 @@ public class NIOUtils {
 			while (buffer.hasRemaining()) {
 				int bytesRead = chan.read(buffer);
 				if (bytesRead == 0) {
-					if (trialNo < RETRY_COUNT) {
+					if (trialNo < RETRIAL_COUNT) {
 						trialNo++;
 						Thread.sleep(SLEEP_TIME_BETWEEN_TRIALS);
 					} else {
@@ -291,70 +236,6 @@ public class NIOUtils {
 	}
 
 	/**
-	 * Returns the next object to be read from this channel, or null if
-	 * no data can be read at this moment. This method assumes that the
-	 * channel is in non-blocking mode and uses the provided buffer to
-	 * read the object in serialized form from the channel. It is assumed
-	 * that the buffer is big enough to hold the entire object in serialized form.
-	 */
-	public static Object readObjFromChannel(ReadableByteChannel chan, ByteBuffer buffer,
-		AtomicBoolean endPointCrashed) throws Exception {
-
-		buffer.clear();
-		buffer.limit(BYTE_COUNT_LONG);
-
-		if (chan.read(buffer) > 0) {
-			while (buffer.hasRemaining()) {
-				chan.read(buffer);
-			}
-			buffer.flip();
-			long nbBytes = buffer.getLong();
-
-			buffer.clear();
-			// We never transfer objects of more than 2GB,
-			// it is thus safe to type cast to int.
-			buffer.limit((int) nbBytes);
-			while (buffer.hasRemaining()) {
-				if (chan.read(buffer) <= 0 && endPointCrashed.get()) {
-					return null;
-				}
-
-			}
-			buffer.flip();
-			return deserializeObject(buffer);
-		} else {
-			return null;
-		}
-	}
-
-	/**
-	 * Returns the next object to be read from this channel, or null if
-	 * no data can be read at this moment. This method assumes that the
-	 * channel is in non-blocking mode and uses the provided buffer to
-	 * read the object in serialized form from the channel. It is assumed
-	 * that the buffer is big enough to hold the entire object in serialized form and of
-	 * length byteCount.
-	 */
-	public static Object readObjFromChannel(ReadableByteChannel chan, int byteCount, ByteBuffer buffer,
-		AtomicBoolean endPointCrashed) throws Exception {
-
-		buffer.clear();
-		buffer.limit(byteCount);
-
-		if (chan.read(buffer) > 0) {
-			while (buffer.hasRemaining()) {
-				if (chan.read(buffer) <= 0 && endPointCrashed.get()) {
-					return null;
-				}
-			}
-			buffer.flip();
-			return deserializeObject(buffer);
-		} else {
-			return null;
-		}
-	}
-
-	/**
 	 * This method serializes the given object and stores it in the provided
 	 * byte buffer. It is assumed that the buffer is big enough to hold
 	 * the entire object.
@@ -362,29 +243,31 @@ public class NIOUtils {
 	 * When the boolean markEndOfHeader is true, the header of the message (the size
 	 * of the message) is followed by a '!'. This is used to send messages to Aneris.
 	 */
-	public static boolean serializeObject(Object obj, ByteBuffer buffer,
+	public static boolean serializeObject(Object obj, ByteBuffer buffer, ByteArrayOutputStream baos,
 		boolean markEndOfHeader) throws IOException {
 
-		ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
-		ObjectOutputStream objOutputStream = new ObjectOutputStream(byteOutputStream);
+		//baos.reset();
+		baos = new ByteArrayOutputStream();
+		ObjectOutputStream objOutputStream = new ObjectOutputStream(baos);
 
 		objOutputStream.writeObject(obj);
-		byte[] objAsByteArray = byteOutputStream.toByteArray();
+		objOutputStream.flush();
+		byte[] objAsByteArray = baos.toByteArray();
 		objOutputStream.close();
 
 		if (markEndOfHeader) {
-			if ((objAsByteArray.length + BYTE_COUNT_LONG + Byte.SIZE) > buffer.capacity()) {
+			if ((objAsByteArray.length + BYTE_COUNT_INT + Byte.SIZE) > buffer.capacity()) {
 				return false;
 			}
 		} else {
-			if ((objAsByteArray.length + BYTE_COUNT_LONG) > buffer.capacity()) {
+			if ((objAsByteArray.length + BYTE_COUNT_INT) > buffer.capacity()) {
 				return false;
 			}
 		}
 
 		// First write the number of bytes the object takes in serialized form.
 		buffer.clear();
-		buffer.putLong(objAsByteArray.length);
+		buffer.putInt(objAsByteArray.length);
 		if (markEndOfHeader) {
 			buffer.put(END_BYTE);
 		}
@@ -392,13 +275,6 @@ public class NIOUtils {
 
 		buffer.flip();
 		return true;
-	}
-
-	public static byte[] serializeObject(Object obj) throws IOException {
-		ByteArrayOutputStream outByteArray = new ByteArrayOutputStream();
-		ObjectOutputStream out = new ObjectOutputStream(outByteArray);
-		out.writeObject(obj);
-		return outByteArray.toByteArray();
 	}
 
 	/** 

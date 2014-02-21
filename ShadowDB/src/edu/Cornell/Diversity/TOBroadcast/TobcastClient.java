@@ -49,54 +49,45 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
-import edu.Cornell.Diversity.ShadowDB.ShadowDBConfig;
-import edu.Cornell.Diversity.TOBroadcast.AnerisMessage.ANERIS_MSG_TYPE;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 import edu.Cornell.Diversity.Utils.NIOUtils;
 
-/**
- * A class that serves as interface between ShadowDB and the Aneris total order
- * broadcast service. The default protocol of Aneris is two-third Consensus.
- * 
- * @author nschiper@cs.cornell.edu
- */
 public class TobcastClient extends Thread {
 
 	private static final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.TOBroadcast.TobcastClient");
 
-	public enum AnerisType {INTERPRETED, LISP};
-
 	/**
-	 * The number of delivered messages between garbage
-	 * collections.
+	 * The maximum number of bytes for a message residing
+	 * in a byte buffer. This can be increased if needed.
 	 */
-	private static final int GC_INTERVAL = 10000;
+	private static final int MAX_MSG_SIZE = 50000;
 
 	/**
 	 * Message separator used when batching messages.
 	 */
-	public static final String MSG_SEPARATOR = "Z";
+	public static final String MSG_SEPARATOR = "[)),]";
 
 	/**
 	 * This is a constant used to specify external tobcast client that
-	 * will only braodcast messages but will not deliver them. External
+	 * will only braodcast messages but not deliver them. External
 	 * clients are not present in Aneris's configuration file.
 	 */
 	public static final int EXTERNAL_CLIENT = -1;
 
+	public static final long BATCHING_TIMEOUT = 1l;
+
 	private final static ConcurrentHashMap<Long, LinkedList<AnerisMessage>> DELIVERED_MSG_BUFF =
 		new ConcurrentHashMap<Long, LinkedList<AnerisMessage>>();
 
-	private final static ConcurrentLinkedQueue<AnerisMessage> TOBCAST_MSG_BUF =
-		new ConcurrentLinkedQueue<AnerisMessage>();
+	private final static LinkedBlockingQueue<AnerisMessage> TOBCAST_MSG_BUF =
+		new LinkedBlockingQueue<AnerisMessage>();
 
 	private final static LinkedList<AtomicLong> CLIENT_SLOTS =
 		new LinkedList<AtomicLong>();
@@ -113,18 +104,28 @@ public class TobcastClient extends Thread {
 
 	private static boolean THREAD_STARTED = false;
 
-	private static SocketChannel[] SOCKETS;
-
-	private static AtomicBoolean TERMINATE;
+	public enum AnerisType {INTERPRETED, LISP};
 
 	private static AnerisType ANERIS_TYPE;
+
+	private static SocketChannel[] SOCKETS;
+
+	private final LinkedList<IdIpPort> servers;
+
 	/**
 	 * This represents the index of the next message the client
-	 * should deliver.
+	 * should deliver. This is used to ensure clients deliver messages
+	 * without gaps. Gaps may happen because the to-bcast server
+	 * we were connected to crashed and we had to reconnect to a
+	 * new one, missing some messages in the meantime.
 	 */
 	private AtomicLong indexNextMsg;
 
-	private int clientId;
+	/**
+	 * A selector on which to call wake-up when messages
+	 * can be delivered. This field is not always initialized.
+	 */
+	private Selector registeredSelector;
 
 	/**
 	 * Creates a tobcast client to broadcast messages that are delivered in
@@ -132,55 +133,62 @@ public class TobcastClient extends Thread {
 	 * not deliver them, one can specify {@code EXTERNAL_CLIENT} as the port
 	 * number.
 	 */
-	private TobcastClient(int clientId, long startSlot) {
-		this.clientId = clientId;
-		this.indexNextMsg = new AtomicLong(startSlot);
+	private TobcastClient(LinkedList<IdIpPort> servers, int clientPort, AnerisType type, long startSlot,
+		Selector selector) {
+		this.servers = servers;
+		indexNextMsg = new AtomicLong(startSlot);
+
+		if (selector != null) {
+			this.registeredSelector = selector;
+		}
 	}
 
 	/**
 	 * Creates a TobcastClient and specifies the first slot to deliver.
 	 */
 	public synchronized static TobcastClient newInstance(LinkedList<IdIpPort> servers, int clientPort,
-		AnerisType anerisType, int clientId, long startSlot) throws IOException {
+		AnerisType type, long startSlot, Selector selector) throws IOException {
 
-		TobcastClient client = new TobcastClient(clientId, startSlot);
+		TobcastClient client = new TobcastClient(servers, clientPort, type, startSlot, selector);
 
 		synchronized(CLIENT_SLOTS) {
 			CLIENT_SLOTS.add(client.indexNextMsg);
 		}
 
 		/**
-		 * Start one thread that is responsible to receive messages from Aneris
-		 * and put them in the message buffer.
+		 * Start one thread that is responsible to receive msgs from Aneris
+		 * and put them in the msg. buffer.
 		 */
 		if (!THREAD_STARTED) {
 			DELIVERED_MSG_LOCK = new ReentrantLock();
 			DELIVERED_MSG_COND = DELIVERED_MSG_LOCK.newCondition();
 
-			ByteBuffer buffer = ByteBuffer.allocate(ShadowDBConfig.getMaxMsgSize());
+			ByteBuffer buffer = ByteBuffer.allocate(MAX_MSG_SIZE);
 			SOCKETS = new SocketChannel[servers.size()];
 			connectToServers(SOCKETS, servers, clientPort, buffer);
+			ANERIS_TYPE = type;
 			SELECTOR = Selector.open();
-			THREAD_STARTED = true;
-			TERMINATE = new AtomicBoolean(false);
-			ANERIS_TYPE = anerisType;
 
+			THREAD_STARTED = true;
+			
 			client.start();
 		}
 		return client;
 	}
 
-	public static TobcastClient newInstance(LinkedList<IdIpPort> servers, int clientPort, int clientId,
-		AnerisType anerisType)
-		throws IOException {
+	public static TobcastClient newInstance(LinkedList<IdIpPort> servers, int clientPort,
+		AnerisType type) throws IOException {
 
-		return newInstance(servers, clientPort, anerisType, clientId, 1l);
+		return newInstance(servers, clientPort, type, 1l, null);
+	}
+
+	public static TobcastClient newInstance(LinkedList<IdIpPort> servers, int clientPort,
+		AnerisType type, Selector selector) throws IOException {
+
+		return newInstance(servers, clientPort, type, 1l, selector);
 	}
 
 	public void closeSockets() {
-		TERMINATE.set(true);
-		SELECTOR.wakeup();
-
 		for (int i = 0; i < SOCKETS.length; i++) {
 			try {
 				if (SOCKETS[i] != null) {
@@ -237,9 +245,11 @@ public class TobcastClient extends Thread {
 
 	public void run() {
 		HashSet<SelectionKey> keys = new HashSet<SelectionKey>();
-		ByteBuffer byteBuffer = ByteBuffer.allocate(ShadowDBConfig.getMaxMsgSize());
+		ByteBuffer byteBuffer = ByteBuffer.allocate(MAX_MSG_SIZE);
 		long slotNextMsg = 1l;
-		long seqNo = 0l;
+		long cmdId = 1l;
+
+		int[] batchSizeCount = new int[100];
 
 		/**
 		 * Registering the channels to do asynchronous I/O and
@@ -252,14 +262,16 @@ public class TobcastClient extends Thread {
 				key.attach(socket);
 			}
 		} catch (Exception e) {
-			LOG.severe("Unable to initialize asynchronous I/O for tobcast client, caught exception: " + e);
+			LOG.severe("Unable to init NIO for tobcast client, caught exception: " + e);
 			return;
 		}
 
 		/**
 		 * The main loop.
 		 */
-		while (!TERMINATE.get()) {
+		for (;;) {
+			boolean waitingForDelivery = false;
+
 			try {
 				int nbChannelsReady = SELECTOR.select();
 
@@ -284,13 +296,17 @@ public class TobcastClient extends Thread {
 							long slot = AnerisMessage.parseSlot(rcvdMsg, ANERIS_TYPE);
 
 							if (slot >= slotNextMsg) {
-								LinkedList<AnerisMessage> anerisMsg = AnerisMessage.parseString(rcvdMsg, slot,
-									ANERIS_TYPE);
+								LinkedList<AnerisMessage> anerisMsg = AnerisMessage.parseString(rcvdMsg, slot, ANERIS_TYPE);
+								batchSizeCount[anerisMsg.size()]++;
 
 								if (DELIVERED_MSG_BUFF.putIfAbsent(slot, anerisMsg) == null) {
-
 									if (slot == slotNextMsg) {
+										waitingForDelivery = false;
 										slotNextMsg++;
+
+										if (registeredSelector != null) {
+											registeredSelector.wakeup();
+										}
 
 										try {
 											DELIVERED_MSG_LOCK.lock();
@@ -306,7 +322,7 @@ public class TobcastClient extends Thread {
 				}
 
 				// Garbage collect DELIVERED_MSG_BUFF
-				if (slotNextMsg % GC_INTERVAL == 0) {
+				if (slotNextMsg % 10000 == 0) {
 
 					long minSlot = Long.MAX_VALUE;
 					synchronized(CLIENT_SLOTS) {
@@ -323,35 +339,27 @@ public class TobcastClient extends Thread {
 					GC_SLOT = minSlot;
 				}
 
-				if (!TOBCAST_MSG_BUF.isEmpty()) {
-					StringBuffer sb = new StringBuffer();
+				if (!TOBCAST_MSG_BUF.isEmpty() && !waitingForDelivery) {
 					AnerisMessage msgToBcast;
-					ANERIS_MSG_TYPE msgType = null;
 
 					while ((msgToBcast = TOBCAST_MSG_BUF.poll()) != null) {
-						if (sb.length() > 0) {
-							if (msgToBcast.getType() == msgType) {
-								sb.append(MSG_SEPARATOR);
-
-							} else {
-								// We can only batch messages of the same MessageType!
-								TOBCAST_MSG_BUF.add(msgToBcast);
-								break;
-							}
-						} else {
-							msgType = msgToBcast.getType();
-						}
-						sb.append(msgToBcast.nuprlProposal());
+						String nuprlProposal = AnerisMessage.toNuprlString(ANERIS_TYPE, msgToBcast.getType(), cmdId++,
+							msgToBcast.nuprlProposal());
+						sendMsgToAneris(nuprlProposal, byteBuffer);
+						waitingForDelivery = true;
 					}
+				}
 
-					long commandId = clientId * 100000000l + seqNo++;
-					String nuprlProposal = AnerisMessage.toNuprlString(ANERIS_TYPE, msgType, commandId, sb.toString());
-					sendMsgToAneris(nuprlProposal, byteBuffer);
-					sb.delete(0,  sb.length());
-
+				if (slotNextMsg % 1000 == 0) {
+					for (int i = 0; i < batchSizeCount.length; i++) {
+						if (batchSizeCount[i] > 0) {
+							LOG.info("batch of size " + i + " count: " + batchSizeCount[i]);
+						}
+					}
 				}
 			} catch (Exception e) {
 				LOG.warning("Caught exception: " + e + " in Tobcast client thread");
+				e.printStackTrace();
 			}
 		}
 	}
@@ -393,8 +401,8 @@ public class TobcastClient extends Thread {
 	}
 
 	/**
-	 * This method broadcasts an Aneris message to the databases. Delivery of
-	 * this message will happen at the same index at all replicas.
+	 * This method broadcasts view change messages to databases. Delivery of
+	 * these messages happen in total order.
 	 */
 	public void toBcast(AnerisMessage msg) {
 		TOBCAST_MSG_BUF.add(msg);
@@ -410,8 +418,6 @@ public class TobcastClient extends Thread {
 		long slot = indexNextMsg.get();
 		LinkedList<AnerisMessage> msgsToDeliver = null;
 
-		msgsToDeliver = DELIVERED_MSG_BUFF.get(slot);
-
 		try {
 			DELIVERED_MSG_LOCK.lock();
 			do {
@@ -420,14 +426,17 @@ public class TobcastClient extends Thread {
 					DELIVERED_MSG_COND.await();
 				}
 			} while (msgsToDeliver == null);
-
 		} catch (InterruptedException ie) {
 			// There's not much to be done here...
 		} finally {
 			DELIVERED_MSG_LOCK.unlock();
 		}
 
-		indexNextMsg.incrementAndGet();
+		LinkedList<AnerisMessage> otherMsgs = null;
+
+		while ((otherMsgs = DELIVERED_MSG_BUFF.get(indexNextMsg.incrementAndGet())) != null) {
+			msgsToDeliver.addAll(otherMsgs);
+		}
 		return msgsToDeliver;
 	}
 
