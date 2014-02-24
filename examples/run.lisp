@@ -1,4 +1,4 @@
-; Copyright 2011 Cornell University
+;; Copyright 2011 Cornell University
 ;; Copyright 2012 Cornell University
 ;; Copyright 2013 Cornell University
 ;;
@@ -2263,6 +2263,7 @@
 		(outputs     (intransit-messages-to-list (pair-snd pair))))
 	    ;; TO COMMENT 2
 	    ;;(print-eml-loc loc (format nil "sending ~A messages" (list-length outputs)))
+	    ;;(print-eml-loc loc (format nil "sending ~A messages: ~A" (list-length outputs) outputs))
 	    ;; inmsgs are the messages from outputs that we have to send to ourselves
 	    (let ((inmsgs (send-outputs loc outnfo nfos outputs nil)))
 	      (run-on-messages loc new-program (append rest inmsgs) outnfo nfos)
@@ -2280,6 +2281,7 @@
   (let* ((msgs (receive-messages loc nfos)))
     ;; TO COMMENT 2
     ;;(print-eml-loc loc (format nil "received ~A messages, running program" (list-length msgs)))
+    ;;(print-eml-loc loc (format nil "received ~A messages: ~A" (list-length msgs) msgs))
     ;;(print-eml-loc loc (format nil "connections: ~A" nfos))
     ;; TO COMMENT
     ;;(if member nil (print-eml-loc loc (format nil "~A" msgs)))

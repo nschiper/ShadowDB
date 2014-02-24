@@ -31,7 +31,7 @@
 %parameters
  Op       : TYPE(Tok List)
  accpts   : {LOC(acc1);LOC(acc2);LOC(acc3)}
- clients  : {LOC(client1)}
+ clients  : {LOC(client1);LOC(client2);LOC(client3)}
  eq_Op    : DEQ(Tok List)
  flrs     : 1
  ldrs     : {LOC(ldr1);LOC(ldr2)}
