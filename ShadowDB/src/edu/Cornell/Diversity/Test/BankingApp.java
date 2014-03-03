@@ -39,15 +39,20 @@
 package edu.Cornell.Diversity.Test;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 import edu.Cornell.Diversity.ShadowDB.DBConnection;
-import edu.Cornell.Diversity.ShadowDB.ShadowDBConnection;
+import edu.Cornell.Diversity.ShadowDB.ShadowDBSMRConnection;
+import edu.Cornell.Diversity.ShadowDB.ShadowDbPBConnection;
 import edu.Cornell.Diversity.ShadowDB.ShadowTransaction;
 import edu.Cornell.Diversity.ShadowDB.TransactionId;
+import edu.Cornell.Diversity.TOBroadcast.AnerisMessage;
+import edu.Cornell.Diversity.TOBroadcast.TobcastClient;
+import edu.Cornell.Diversity.TOBroadcast.TobcastClient.AnerisType;
 import edu.Cornell.Diversity.Utils.ConfigurationParser;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 import edu.Cornell.Diversity.Utils.TransactionIdGenerator;
@@ -64,6 +69,8 @@ public class BankingApp extends Thread {
 	private static final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.Test.BankingApp");
 
 	public static final String TABLE_NAME = "ACCOUNTS";
+
+	public static final int ACCOUNT_COUNT = 50000;
 
 	private static enum CLIENT_TYPE {POPULATE, WARMUP, BENCHMARK};
 
@@ -83,25 +90,39 @@ public class BankingApp extends Thread {
 	 */
 	private final boolean readOnly;
 
-	private final int accountCount;
-
 	private final AtomicInteger noExecutedTrans;
+
+	private AnerisType anerisType;
 
 	/**
 	 * A connection to ShadowDB when replicated in a primary-backup fashion.
 	 */
 	private DBConnection dbConnection;
 
-	public BankingApp(int clientNo, String configFile, boolean readOnly, int accountCount) throws Exception {
+	public BankingApp(int clientNo, String configFile, boolean readOnly,
+		AnerisType anerisType) throws Exception {
 
 		this.clientId = "BankingApp-" + clientNo;
 		this.readOnly = readOnly;
-		this.accountCount = accountCount;
 		this.noExecutedTrans = new AtomicInteger(0);
 		this.latencies = new LinkedList<Long>();
+		this.anerisType = anerisType;
+
 		ConfigurationParser configParser = new ConfigurationParser(configFile);
 		LinkedList<IdIpPort> allDbs = configParser.getDbServers();
-		this.dbConnection = new ShadowDBConnection(clientId, allDbs);
+
+		if (anerisType == AnerisType.INTERPRETED) {
+			this.dbConnection = new ShadowDbPBConnection(clientId, allDbs);
+		} else {
+			LinkedList<IdIpPort> tobcastServers = configParser.getToBCastServers();
+
+			Integer clientPort = configParser.getPortFromId("client" + this.clientId);
+			if (clientPort == null) {
+				clientPort = TobcastClient.EXTERNAL_CLIENT;
+			}
+			TobcastClient tobcast = TobcastClient.newInstance(tobcastServers, clientPort, anerisType);
+			this.dbConnection = new ShadowDBSMRConnection(clientId, allDbs, tobcast);
+		}
 		configParser.closeConfigFile();
 	}
 
@@ -113,43 +134,70 @@ public class BankingApp extends Thread {
 		return this.averageLatency;
 	}
 
-	private ShadowTransaction generateNextTransaction(boolean readOnly,
+	private ShadowTransaction generateShadowTrans(boolean readOnly,
 		TransactionIdGenerator idGenerator, Random rnd) {
 
 		TransactionId id = idGenerator.getNextId();
 		ShadowTransaction t;
 
 		if (readOnly) {
-			int[] rndAccounts = {rnd.nextInt(accountCount)};
+			int[] rndAccounts = {rnd.nextInt(ACCOUNT_COUNT)};
 
 			t = new BalanceTransaction(id, rndAccounts);
 		} else {
-			int[] rndAccounts = {rnd.nextInt(accountCount)};
+			int[] rndAccounts = {rnd.nextInt(ACCOUNT_COUNT)};
 			int amount = rnd.nextInt(100000);
 			t = new DepositTransaction(id, rndAccounts, amount);
 		}
 		return t;
 	}
 
+	private AnerisMessage generateMiniTrans(boolean readOnly, Random rnd) {
+
+		LinkedList<Integer> keysToRead = new LinkedList<Integer>();
+		HashMap<Integer, Integer> keysToWrite = new HashMap<Integer, Integer>();
+
+		if (readOnly) {
+			keysToRead.add(rnd.nextInt(ACCOUNT_COUNT));
+		} else {
+			keysToWrite.put(rnd.nextInt(ACCOUNT_COUNT), rnd.nextInt(10000));
+		}
+		return new AnerisMessage(clientId, keysToRead, keysToWrite);
+	}
+
 	public void run() {
 
-		int nbTransToExec = 10000;
+		int nbTransToExec;
+
+		if (anerisType == AnerisType.INTERPRETED) {
+			nbTransToExec = 10000;
+		} else {
+			nbTransToExec = 100;
+		}
 
 		TransactionIdGenerator idGenerator = new TransactionIdGenerator();
 
 		Random rnd = new Random(System.currentTimeMillis());
 		long start = System.currentTimeMillis();
-		ShadowTransaction toExecute = null;
 
 		for (int i = noExecutedTrans.get(); i < nbTransToExec; i++) {
-			toExecute = generateNextTransaction(readOnly, idGenerator, rnd);
-
 			long startExec = System.currentTimeMillis();
-			dbConnection.submit(toExecute);
+
+			if (anerisType == AnerisType.INTERPRETED) {
+				ShadowTransaction toExecute = generateShadowTrans(readOnly, idGenerator, rnd);
+				dbConnection.submit(toExecute);
+			} else {
+				AnerisMessage toExecute = generateMiniTrans(readOnly, rnd);
+				dbConnection.submit(toExecute);
+			}
 			long endExec = System.currentTimeMillis();
 			latencies.add(endExec - startExec);
 
 			noExecutedTrans.set(i);
+
+			if (i % 100 == 0) {
+				LOG.info(clientId + ": submitted " + i + " transactions");
+			}
 		}
 
 		LOG.info("Client: " + clientId + " done executing transactions!");
@@ -198,12 +246,13 @@ public class BankingApp extends Thread {
 	}
 
 	private static void runClients(String configFile, int clientCount, CLIENT_TYPE clientType,
-		boolean readOnly, int accountCount, boolean showResults) throws Exception {
+		boolean readOnly, AnerisType anerisType,
+		boolean showResults) throws Exception {
 
 		BankingApp[] clients = new BankingApp[clientCount];
 
 		for (int i = 0; i < clientCount; i++) {
-			clients[i] = new BankingApp(i, configFile, readOnly, accountCount);
+			clients[i] = new BankingApp(i + 1, configFile, readOnly, anerisType);
 			clients[i].start();
 		}
 
@@ -241,10 +290,18 @@ public class BankingApp extends Thread {
 
 	public void populateDb() {
 		TransactionId id = new TransactionId("myIp", Thread.currentThread().getId(), 0);
-		PopulateBankDBTransaction populateTrans = new PopulateBankDBTransaction(id, accountCount);
 
 		try {
-			dbConnection.submit(populateTrans);
+			if (anerisType == AnerisType.INTERPRETED) {
+				PopulateBankDBTransaction populateTrans = new PopulateBankDBTransaction(id);
+				dbConnection.submit(populateTrans);
+			} else {
+				LinkedList<Integer> keysToRead = new LinkedList<Integer>();
+				HashMap<Integer, Integer> keysToWrite = new HashMap<Integer, Integer>();
+				
+				AnerisMessage populateTrans = new AnerisMessage(clientId, keysToRead, keysToWrite);
+				dbConnection.submit(populateTrans);
+			}
 		} catch (Exception e) {
 			LOG.warning("Unable to populate bank database, caught exception: " + e);
 		}
@@ -256,25 +313,27 @@ public class BankingApp extends Thread {
 			if (args.length == 6) {
 				String configFile = args[0];
 				boolean readOnly = args[1].equals("read-only");
-				int accountCount = Integer.parseInt(args[2]);
 
-				int minClientCount = Integer.parseInt(args[3]);
-				int maxClientCount = Integer.parseInt(args[4]);
-				int clientIncrement = Integer.parseInt(args[5]);
+				int minClientCount = Integer.parseInt(args[2]);
+				int maxClientCount = Integer.parseInt(args[3]);
+				int clientIncrement = Integer.parseInt(args[4]);
+
+				AnerisType anerisType = AnerisType.valueOf(args[5]);
 
 				String config = "Started Banking app with parameters: \n"
 					+ "\t config file: " + configFile + "\n"
 					+ "\t read only: " + readOnly + "\n"
-					+ "\t acount count: " + accountCount + "\n"
+					+ "\t account count: " + ACCOUNT_COUNT + "\n"
 					+ "\t min clients: " + minClientCount + "\n"
 					+ "\t max client: " + maxClientCount + "\n"
-					+ "\t clientIncrement: " + clientIncrement;
+					+ "\t clientIncrement: " + clientIncrement + "\n"
+					+ "\t aneris's type: " + anerisType;
 				LOG.info(config);
 
 				/**
 				 * Populate database.
 				 */
-				BankingApp app = new BankingApp(0 /*clientNo */, configFile, readOnly, accountCount);
+				BankingApp app = new BankingApp(1 /*clientNo */, configFile, readOnly, anerisType);
 				app.populateDb();
 				app.dbConnection.close();
 
@@ -282,20 +341,21 @@ public class BankingApp extends Thread {
 				 * Warm up database.
 				 */
 				runClients(configFile, 5 /* clientCount */, CLIENT_TYPE.WARMUP,
-					false /* read-only? */, accountCount, false /* showResults */);
+					false /* read-only? */, anerisType, false /* showResults */);
 
 				/**
 				 * Run benchmark.
 				 */
 				for (int i = minClientCount; i <= maxClientCount; i += clientIncrement) {
 					runClients(configFile, i /* clientCount */, CLIENT_TYPE.BENCHMARK,
-						readOnly, accountCount, true /* showResults */);
+						readOnly, anerisType, true /* showResults */);
 				}
 			} else {
 				System.err.println("Please specify a configuration file, "
 					+ ", whether to issue read-only transactions or not (read-only/update)"
 					+ ", the number of rows the ACCOUNT table should contain"
-					+ ", the min/max client count, and the client count increment.");
+					+ ", the min/max client count, the client count increment,"
+					+ " and aneris's type (INTERPRETED/LISP).");
 			}
 		} catch (Exception e) {
 			LOG.warning("Unable to start BankingApp, caught exception: " + e);

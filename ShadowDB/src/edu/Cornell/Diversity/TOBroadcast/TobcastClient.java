@@ -247,7 +247,6 @@ public class TobcastClient extends Thread {
 		HashSet<SelectionKey> keys = new HashSet<SelectionKey>();
 		ByteBuffer byteBuffer = ByteBuffer.allocate(MAX_MSG_SIZE);
 		long slotNextMsg = 1l;
-		long cmdId = 1l;
 
 		int[] batchSizeCount = new int[100];
 
@@ -343,23 +342,14 @@ public class TobcastClient extends Thread {
 					AnerisMessage msgToBcast;
 
 					while ((msgToBcast = TOBCAST_MSG_BUF.poll()) != null) {
-						String nuprlProposal = AnerisMessage.toNuprlString(ANERIS_TYPE, msgToBcast.getType(), cmdId++,
+						String nuprlProposal = AnerisMessage.toNuprlString(ANERIS_TYPE, msgToBcast.getType(), msgToBcast.getCmdId(),
 							msgToBcast.nuprlProposal());
 						sendMsgToAneris(nuprlProposal, byteBuffer);
 						waitingForDelivery = true;
 					}
 				}
-
-				if (slotNextMsg % 1000 == 0) {
-					for (int i = 0; i < batchSizeCount.length; i++) {
-						if (batchSizeCount[i] > 0) {
-							LOG.info("batch of size " + i + " count: " + batchSizeCount[i]);
-						}
-					}
-				}
 			} catch (Exception e) {
 				LOG.warning("Caught exception: " + e + " in Tobcast client thread");
-				e.printStackTrace();
 			}
 		}
 	}

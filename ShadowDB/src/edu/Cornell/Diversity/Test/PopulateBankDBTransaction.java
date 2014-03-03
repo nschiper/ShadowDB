@@ -59,11 +59,8 @@ public class PopulateBankDBTransaction extends ShadowTransaction {
 	private static final long serialVersionUID = 1L;
 	private static transient final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.Test.PopulateBankDBTransaction");
 
-	private int accountCount;
-
-	public PopulateBankDBTransaction(TransactionId id, int accountCount) {
+	public PopulateBankDBTransaction(TransactionId id) {
 		super(id, false /* read-only? */);
-		this.accountCount = accountCount;
 	}
 
 	private void createTables(Connection connection) throws SQLException {
@@ -81,7 +78,7 @@ public class PopulateBankDBTransaction extends ShadowTransaction {
 		insertStmt = connection.prepareStatement("insert into " + BankingApp.TABLE_NAME +
 			" values (?, ?, ?)");
 
-		for (int i = 1; i <= accountCount; i++) {
+		for (int i = 1; i <= BankingApp.ACCOUNT_COUNT; i++) {
 			insertStmt.setInt(1, i);
 			insertStmt.setInt(2, i);
 			insertStmt.setFloat(3, 0f);
@@ -93,7 +90,7 @@ public class PopulateBankDBTransaction extends ShadowTransaction {
 			}
 		}
 		// Make sure that the last batch gets executed.
-		if (accountCount % 1000 != 0) {
+		if (BankingApp.ACCOUNT_COUNT % 1000 != 0) {
 			insertStmt.executeBatch();
 			insertStmt.close();
 		}
@@ -105,7 +102,7 @@ public class PopulateBankDBTransaction extends ShadowTransaction {
 			createTables(connection);
 			populateSqlDb(connection);
 			LOG.info("Populated table " + BankingApp.TABLE_NAME + " with "
-				+ accountCount + " accounts.");
+				+ BankingApp.ACCOUNT_COUNT + " accounts.");
 		} else {
 			LOG.info("Table " + BankingApp.TABLE_NAME + " already exists, skipping database population.");
 		}

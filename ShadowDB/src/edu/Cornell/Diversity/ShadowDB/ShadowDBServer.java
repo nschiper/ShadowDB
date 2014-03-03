@@ -93,7 +93,7 @@ import edu.Cornell.Diversity.Utils.TransactionIdGenerator;
  * @author nschiper@cs.cornell.edu
  *
  */
-public class ShadowDBServer {
+public class ShadowDBServer implements ShadowDB {
 
 	private static final Logger LOG = Logger.getLogger("edu.Cornell.Diversity.ShadowDB.ShadowDBServer");
 

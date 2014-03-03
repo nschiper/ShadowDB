@@ -40,6 +40,8 @@ package edu.Cornell.Diversity.ShadowDB;
 
 import java.sql.Connection;
 
+import edu.Cornell.Diversity.TOBroadcast.AnerisMessage;
+
 /**
  * The interface of the ShadowDB replicated database.
  * 
@@ -49,7 +51,7 @@ public interface DBConnection {
 
 	public QueryResult submit(ShadowTransaction transaction);
 
-	public Connection getConnection();
+	public QueryResult submit(AnerisMessage transaction);
 
 	public void close() throws Exception;
 }

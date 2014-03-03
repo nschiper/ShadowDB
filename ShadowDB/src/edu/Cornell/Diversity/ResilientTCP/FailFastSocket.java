@@ -293,7 +293,6 @@ public class FailFastSocket extends Thread {
 
 				// Suspect the end point to have crashed?
 				if (lastRcvdMsgTS <= (now - ShadowDBConfig.getHeartBeatTimeout())) {
-					System.out.println(System.currentTimeMillis() + " suspected " + endPointId + " because of timeout");
 					notifyCrash();
 					continue;
 				}
@@ -334,16 +333,12 @@ public class FailFastSocket extends Thread {
 							}
 						}
 						if (pipeParser.endPointSuspected() || socketParser.endPointSuspected()) {
-							System.out.println(System.currentTimeMillis() + " suspected " + endPointId + " because read -1");
-
 							notifyCrash();
 						}
 					}
 				}
 			}
 		} catch (Exception e) {
-			System.out.println(System.currentTimeMillis() + " suspected " + endPointId + " because of exception");
-
 			/**
 			 * If any exception is raised, we consider the other end to have crashed.
 			 */

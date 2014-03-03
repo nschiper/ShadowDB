@@ -42,7 +42,7 @@ package edu.Cornell.Diversity.Utils;
 import java.net.ServerSocket;
 import java.util.LinkedList;
 
-import edu.Cornell.Diversity.ShadowDB.ShadowDBServer;
+import edu.Cornell.Diversity.ShadowDB.ShadowDB;
 
 /**
  * A utility class that ensures that TCP and database connections are closed
@@ -54,13 +54,13 @@ public class ShutdownHook {
 
 	private static LinkedList<ServerSocket> socketsToClose = new LinkedList<ServerSocket>();
 
-	private static LinkedList<ShadowDBServer> dbsToClose = new LinkedList<ShadowDBServer>();
+	private static LinkedList<ShadowDB> dbsToClose = new LinkedList<ShadowDB>();
 
 	public static void addSocketToClose(ServerSocket socket) {
 		socketsToClose.add(socket);
 	}
 
-	public static void addDbToClose(ShadowDBServer db) {
+	public static void addDbToClose(ShadowDB db) {
 		dbsToClose.add(db);
 	}
 
@@ -82,7 +82,7 @@ public class ShutdownHook {
 	                	}
                 	}
  
-                	for (ShadowDBServer db : dbsToClose) {
+                	for (ShadowDB db : dbsToClose) {
                 		if (db != null) {
                 			db.closeDb();
                 		}

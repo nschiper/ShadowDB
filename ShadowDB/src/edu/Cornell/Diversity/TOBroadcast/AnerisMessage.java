@@ -38,6 +38,8 @@
 
 package edu.Cornell.Diversity.TOBroadcast;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Scanner;
@@ -45,8 +47,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import edu.Cornell.Diversity.ShadowDB.QueryResult;
 import edu.Cornell.Diversity.ShadowDB.ShadowDBConfig;
+import edu.Cornell.Diversity.ShadowDB.TransactionId;
 import edu.Cornell.Diversity.TOBroadcast.TobcastClient.AnerisType;
+import edu.Cornell.Diversity.Test.MiniTransaction;
 import edu.Cornell.Diversity.Utils.DbUtils;
 import edu.Cornell.Diversity.Utils.IdIpPort;
 
@@ -170,7 +175,7 @@ public class AnerisMessage {
 		this.msgType = MessageType.SWAP;
 		this.protocol = protocol;
 		this.proposerId = FAKE_ID;
-		this.uid = id.incrementAndGet();
+		this.uid = DbUtils.extractIntFromId(proposerId) + (ShadowDBConfig.getMaxClientCount() * id.incrementAndGet());
 	}
 
 	public AnerisMessage(LinkedList<IdIpPort> members, long seqNo, String proposerId) {
@@ -189,7 +194,7 @@ public class AnerisMessage {
 		this.keysToRead = keysToRead;
 		this.keysToWrite = keysToWrite;
 		this.proposerId = FAKE_ID;
-		this.uid = DbUtils.extractIntFromId(proposerId) + (ShadowDBConfig.getMaxClientCount() * id.incrementAndGet());
+		this.uid = DbUtils.extractIntFromId(clientId) + (ShadowDBConfig.getMaxClientCount() * id.incrementAndGet());
 	}
 
 	/**
@@ -198,7 +203,7 @@ public class AnerisMessage {
 	public AnerisMessage(String proposerId) {
 		this.msgType = MessageType.DUMMY;
 		this.proposerId = proposerId;
-		this.uid = id.incrementAndGet();
+		this.uid = DbUtils.extractIntFromId(proposerId) + (ShadowDBConfig.getMaxClientCount() * id.incrementAndGet());
 	}
 
 	public static AnerisMessage parseConfiguration(String configuration) {
@@ -587,6 +592,10 @@ public class AnerisMessage {
 		return seqNo;
 	}
 
+	public long getCmdId() {
+		return uid;
+	}
+
 	public String getProposerId() {
 		return proposerId;
 	}
@@ -609,5 +618,18 @@ public class AnerisMessage {
 
 	public String getClientId() {
 		return clientId;
+	}
+
+	/**
+	 * Executes the stored procedure reflected by this transaction.
+	 */
+	public QueryResult execute(Connection conn, TransactionId id) throws SQLException {
+		if (msgType == MessageType.TRANS) {
+			MiniTransaction trans = new MiniTransaction(id, keysToRead, keysToWrite);
+			return trans.executeSql(conn);
+			
+		} else {
+			throw new UnsupportedOperationException("Cannot execute aneris message of type: " + msgType);
+		}
 	}
 }
