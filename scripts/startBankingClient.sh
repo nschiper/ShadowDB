@@ -1,9 +1,9 @@
 # $1 configuration file
 # $2 "read-only" for read-only transactions or "update" for update transactions
-# $3 number of bank accounts
-# $4 minimum number of clients
-# $5 maximum number of clients
-# $6 client count increment
+# $3 minimum number of clients
+# $4 maximum number of clients
+# $5 client count increment
+# $6 aneris mode (INTERPRETED/LISP)
 
 JARS=../jars/ShadowDB.jar
 LOG_PROP=../conf/logging.properties
