@@ -718,12 +718,20 @@
     (lambda (lst) (make-pair :fst (funcall exp lst) :snd (funcall explist lst)))
     )
 
-  (defun parse-pair-1 (x)
+  (defun parse-pair-atoms-1 (x)
     (make-pair :fst x :snd (make-axiom))
     )
 
-  (defun parse-pair-2 (x y)
+  (defun parse-pair-atoms-2 (x)
+    (make-pair :fst (format nil "~A" x) :snd (make-axiom))
+    )
+
+  (defun parse-pair-atoms-3 (x y)
     (make-pair :fst x :snd y)
+    )
+
+  (defun parse-pair-atoms-4 (x y)
+    (make-pair :fst (format nil "~A" x) :snd y)
     )
 
   (defun parse-exploc-1 (loc lparen id rparen)
@@ -743,6 +751,16 @@
     (lambda (lst)
       (declare (ignore lst))
       atomlist)
+    )
+
+  (defun parse-msg-0 (id colon lparen rparen)
+    (declare (ignore colon))
+    (declare (ignore lparen))
+    (declare (ignore rparen))
+    (make-intransit :id id
+		    :header ""
+		    :type ""
+		    :expression (lambda (lst) (declare (ignore lst)) (make-axiom)))
     )
 
   (defun parse-msg-1 (id colon lparen atoms comma1 typ comma2 exp rparen)
@@ -787,6 +805,7 @@
 	       :deq
 	       :loc
 	       :lam
+	       :seq
 	       :backquote
 	       :locations
 	       :connections
@@ -883,8 +902,12 @@
    )
 
   (atomlist
-   (:id          #'parse-pair-1)
-   (:id atomlist #'parse-pair-2)
+   (:seq          #'parse-pair-atoms-1)
+   (:id           #'parse-pair-atoms-1)
+   (:int          #'parse-pair-atoms-1)
+   (:seq atomlist #'parse-pair-atoms-3)
+   (:id  atomlist #'parse-pair-atoms-3)
+   (:int atomlist #'parse-pair-atoms-4)
    )
 
   (expint
@@ -937,6 +960,7 @@
    )
 
   (msg
+   (:id :colon :lparen :rparen #'parse-msg-0)
    (:id :colon :lparen atoms :comma typ :comma exp :rparen #'parse-msg-1)
    )
   )
@@ -959,6 +983,8 @@
     ("TYPE"                  (return (values :type        $@)))
     ("DEQ"                   (return (values :deq         $@)))
     ("[a-zA-Z][a-zA-Z0-9_]*" (return (values :id          $@)))
+    ("[0-9]+"                (return (values :int         $@)))
+    ("[a-zA-Z0-9_/]+"        (return (values :seq         $@)))
     ("\\\\"                  (return (values :lam         $@)))
     ("\\("                   (return (values :lparen      $@)))
     ("\\)"                   (return (values :rparen      $@)))
@@ -972,7 +998,6 @@
     ("\\="                   (return (values :equal       $@)))
     ("\\*"                   (return (values :star        $@)))
     ("\\-\\>"                (return (values :arrow       $@)))
-    ("[0-9]+"                (return (values :int         $@)))
   )
 
      ;; (defun list-lexer (list)
@@ -1762,11 +1787,8 @@
 	(sb-thread:make-thread
 	 (lambda ()
 	   (progn
-	     ;;(print-eml-loc loc "sleeping...")
 	     (sleep (float (/ delay 1000)))
-	     ;;(print-eml-loc loc "woke up")
 	     (send-message-aux loc socket desc stream msg)
-	     ;;(print-eml-loc loc "message sent")
 	     ))
 	 :name "sender")
 	)
@@ -2139,10 +2161,16 @@
 (defun get-msg-of-intransit-message   (dmsg) (pair-snd (pair-snd dmsg)))
 
 (defun run-hdf (loc program msg)
-  (declare (ignore loc))
   ;;(print-eml-loc loc (format nil "running program on ~A" msg))
   (if (inl-p program)
-      (funcall (inl-val program) msg)
+      (handler-case
+	  (funcall (inl-val program) msg)
+	(error (c)
+	  (print-eml-loc loc (format nil "error while running process on message: ~A" c))
+	  (print-eml-loc loc (format nil "discarding input"))
+	  (make-pair :fst program :snd (make-axiom))
+	  )
+	)
       (if (inr-p program)
 	  (progn
 	    "done"
@@ -2256,21 +2284,14 @@
   (if (and program msgs)
       (let ((msg  (car msgs))
 	    (rest (cdr msgs)))
-	;; TOCOMMENT
-	;;(print-eml-loc loc (format nil "running on ~A" msg))
-	;; TOCOMMENT
-	;;(print-eml-loc loc "1")
-	(let ((pair (run-hdf loc program (mk-arg msg))))
-	  ;;(print-eml-loc loc "2")
-	  (let ((new-program (pair-fst pair))
-		(outputs     (intransit-messages-to-list (pair-snd pair))))
-	    ;; TO COMMENT 2
-	    ;;(print-eml-loc loc (format nil "sending ~A messages" (list-length outputs)))
-	    ;;(print-eml-loc loc (format nil "sending ~A messages: ~A" (list-length outputs) outputs))
-	    ;; inmsgs are the messages from outputs that we have to send to ourselves
-	    (let ((inmsgs (send-outputs loc outnfo nfos outputs nil)))
-	      (run-on-messages loc new-program (append rest inmsgs) outnfo nfos)
-	      )
+	(let* ((pair        (run-hdf loc program (mk-arg msg)))
+	       (new-program (pair-fst pair))
+	       (outputs     (intransit-messages-to-list (pair-snd pair))))
+	  ;; TO COMMENT 2
+	  ;;(print-eml-loc loc (format nil "sending ~A messages" (list-length outputs)))
+	  ;; inmsgs are the messages from outputs that we have to send to ourselves
+	  (let ((inmsgs (send-outputs loc outnfo nfos outputs nil)))
+	    (run-on-messages loc new-program (append rest inmsgs) outnfo nfos)
 	    )
 	  )
 	)
@@ -2279,18 +2300,14 @@
   )
 
 (defun run-distributed-program-loop (loc member outnfo nfos program)
-  ;; TOCOMMENT
   ;;(print-eml-loc loc "waiting for a new message")
   (let* ((msgs (receive-messages loc nfos)))
     ;; TO COMMENT 2
     ;;(print-eml-loc loc (format nil "received ~A messages, running program" (list-length msgs)))
-    ;;(print-eml-loc loc (format nil "received ~A messages: ~A" (list-length msgs) msgs))
     ;;(print-eml-loc loc (format nil "connections: ~A" nfos))
     ;; TO COMMENT
     ;;(if member nil (print-eml-loc loc (format nil "~A" msgs)))
     (let ((new-program (run-on-messages loc program msgs outnfo nfos)))
-      ;; TOCOMMENT
-      ;;(print-eml-loc loc "ran program")
       (run-distributed-program-loop loc member outnfo nfos new-program)
       )
     )
@@ -2424,6 +2441,7 @@
   )
 
 (defun delayed-message-handler-send-output (loc outnfo nfos output)
+  ;;(print-eml-loc loc "delayed-message-handler sending output")
   (sb-thread:make-thread
    (lambda ()
      (let ((delay (get-delay-of-intransit-message output))
@@ -2454,7 +2472,6 @@
 
 (defun delayed-message-handler-loop (loc outnfo nfos)
   (let ((msgs (delayed-message-handler-get-msgs loc)))
-    ;; TOCOMMENT
     ;;(print-eml-loc loc (format nil "delayed-message-handler got messages ~A" msgs))
     (delayed-message-handler-send-outputs loc outnfo nfos msgs)
     (delayed-message-handler-loop loc outnfo nfos)
@@ -2598,6 +2615,11 @@
   (mk-swap n "2/3")
   )
 
+(defun mk-dummy-msg (n)
+  (declare (ignore n))
+  (make-axiom)
+  )
+
 (defun mk-swap-paxos-dmsg (loc n)
   (mk-directed-message 0 loc (mk-swap n "paxos"))
   )
@@ -2673,6 +2695,7 @@
     )
   )
 
+
 ;; tests acceptors
 (defun test-acc1 (conf-file) (run-distributed-program "acc1" conf-file main-spec))
 (defun test-acc2 (conf-file) (run-distributed-program "acc2" conf-file main-spec))
@@ -2694,6 +2717,8 @@
 (defun test-propose (n m conf-file) (run-sender #'mk-propose-msg "xxx" "ldr2" n m conf-file))
 (defun test-bcast   (n m conf-file) (run-sender #'mk-bcast-msg   "xxx" "rep2" n m conf-file))
 (defun test-swap    (n conf-file)   (run-sender #'mk-swap-paxos  "xxx" "rep2" n n conf-file))
+(defun test-swap23  (n conf-file)   (run-sender #'mk-swap-23     "xxx" "rep2" n n conf-file))
+(defun test-dummy   (n conf-file)   (run-sender #'mk-dummy-msg   "xxx" "ldr2" n n conf-file))
 
 
 ;; tsts acceptors
@@ -2718,6 +2743,7 @@
 (defun tst-bcast   (n m) (run-sender #'mk-bcast-msg   "xxx" "rep2" n m conf-file))
 (defun tst-swap    (n)   (run-sender #'mk-swap-paxos  "xxx" "rep2" n n conf-file))
 (defun tst-swap23  (n)   (run-sender #'mk-swap-23     "xxx" "rep2" n n conf-file))
+(defun tst-dummy   (n)   (run-sender #'mk-dummy-msg   "xxx" "ldr2" n n conf-file))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
