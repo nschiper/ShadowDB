@@ -9,7 +9,7 @@ RUN_FASL_FILE=run.fasl
 CONF_DF=${ANERIS}/conf/conf_aneris.emlc
 CONF_LOC=${ANERIS}/conf/conf_aneris_local.emlc
 
-CONF=${CONF_LOC}
+CONF=${1:-${CONF_LOC}}
 
 cd $DIR
 

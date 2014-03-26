@@ -1,6 +1,7 @@
 ;; Copyright 2011 Cornell University
 ;; Copyright 2012 Cornell University
 ;; Copyright 2013 Cornell University
+;; Copyright 2014 Cornell University
 ;;
 ;;
 ;; This file is part of EventML - a tool aiming at specifying
@@ -1825,7 +1826,9 @@
       (let* ((msg  (format nil "~S" (mk-directed-message delay dest str)))
 	     (len  (length msg))
 	     (slen (concatenate 'string (prin1-to-string len) "!")))
-	(print-eml-loc loc "sending delayed message to delayed message handler")
+	;;(print-eml-loc loc "sending delayed message to delayed message handler")
+	;; TO COMMENT
+	;;(print-eml-loc loc (format nil "~A" msg))
 	(send-length-and-message-aux loc socket desc stream slen msg)
 	)
       (let* ((len  (length str))
@@ -2188,7 +2191,7 @@
 	(to    (get-loc-of-intransit-message   output))
 	(msg   (get-msg-of-intransit-message   output)))
     ;; TO COMMENT
-    ;;(print-eml-loc loc (format nil "sending msg ~A to ~A" msg to))
+    (print-eml-loc loc (format nil "sending msg ~A to ~A" msg to))
     (if (and (string= loc to) (= delay 0))
 	;; then we don't send the message through the socket, instead we're going
 	;; to directly apply the program to the message.
