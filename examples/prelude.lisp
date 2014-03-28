@@ -17,6 +17,6 @@
 ;; ------ functions ------
 
 (defun fix (str f)
-  ;;(print-eml-loc "fix" str)
+  (print-eml-loc "fix" str)
   (funcall f #'(lambda () (fix str f)))
   )
